@@ -1,3 +1,4 @@
+const fetch = require("node-fetch")
 const os = require("os");
 const url = require("url");
 
@@ -26,8 +27,6 @@ const useTreblle = function (app, { apiKey, projectId }) {
           requestStartTime,
         });
 
-        // console.log(JSON.stringify(trebllePayload, null, 2));
-
         fetch("https://rocknrolla.treblle.com", {
           method: "POST",
           headers: {
@@ -47,7 +46,6 @@ const useTreblle = function (app, { apiKey, projectId }) {
   // we need to overwrite the default send to be ablle to access it
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
-    console.log("calling send");
     originalSend.call(this, body);
     this.__treblle_body_response = body;
   };
@@ -82,7 +80,7 @@ const generateTrebllePayload = function (
       responseBody = JSON.parse(res.__treblle_body_response);
       responseBody = maskSensitiveValues(responseBody);
     } catch {
-      // do nothing if we can't parse the response, in this case we'll have the original values
+      // do nothing if we can't parse the response, in this case we'll have the response's original values untouched
     }
   }
 
@@ -174,6 +172,11 @@ const fieldsToMask = [
  * @returns {object}
  */
 function maskSensitiveValues(payloadObject) {
+  if (typeof payloadObject !== "object") return payloadObject;
+  if (Array.isArray(payloadObject)) {
+    return payloadObject.map(maskSensitiveValues);
+  }
+
   let objectToMask = { ...payloadObject };
 
   let safeObject = Object.keys(objectToMask).reduce(function (acc, propName) {

@@ -1,6 +1,6 @@
 # treblle
 
-Middleware for Treblle integration.
+Middleware for [Treblle](https://treblle.com) integration.
 
 
 ## Installation
@@ -46,16 +46,9 @@ useTreblle(app, {
 
 Both the API key and Project ID can be fetched from Treblle's site.
 
-
-## Build
-
-...
-
-## Testing
-
-...
-
+The API key can be found in [User settings](https://treblle.com/users/settings).
+And the Project ID can be found in your project settings, you can find your projects in [Treblle's Dashboard](https://treblle.com/dashboard).
 
 ## License
 
-...
+[MIT](https://github.com/Treblle/treblle-node/blob/master/LICENSE)
