@@ -133,7 +133,7 @@ const generateTrebllePayload = function (
 };
 
 /**
- * Calculates the request duration.
+ * Calculates the request duration in microseconds.
  *
  * @param {number[]} startTime
  * @returns {number}
