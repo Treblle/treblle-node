@@ -1,54 +1,44 @@
-# treblle
 
-Middleware for [Treblle](https://treblle.com) integration.
+# Treblle for Node
+Treblle makes it super easy to understand what’s going on with your APIs and the apps that use them. To get started with Treblle create a FREE account on <https://treblle.com>.
 
+## Requirements
+* nodejs
+
+## Dependencies
+* [`express`](https://www.npmjs.com/package/express)
+* [`node-fetch`](https://www.npmjs.com/package/node-fetch)
 
 ## Installation
-
-```sh
+You can install Treblle via [NPM](https://www.npmjs.com/). Simply run the following command:
+```bash
 $ npm install treblle
 ```
+Don't forget to load the required JS modules in your app.js like so:
 
-## Usage
+```js
+const express = require("express");
+const router = express.Router();
+const { useTreblle } = require("treblle");
+```
 
-To use the treblle middleware successfuly:
+## Getting started
+The first thing you need to do is create a FREE account on <https://treblle.com> to get an API key and Project ID. After that all you need to do is initialize Treblle in your **app.js** file like so: 
 
-```javascript
+```js
 const app = express();
-
 app.use(express.json());
 
 useTreblle(app, {
-  apiKey: __treblle_apiKey__,
-  projectId: __treblle_projectId__,
+  apiKey: '_YOUR_API_KEY_',
+  projectId: '_YOUR_PROJECT_ID_',
 });
 ```
+That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
 
-You have to enable JSON parsing before calling the `useTreblle` function.
-
-### body-parser
-
-If you are using the `body-parser` package then enable the plugin like this:
-
-```javascript
-const app = express();
-
-app.use(bodyParser.json())
-
-useTreblle(app, {
-  apiKey: __treblle_apiKey__,
-  projectId: __treblle_projectId__,
-});
-```
-
-
-## API Key and Project ID
-
-Both the API key and Project ID can be fetched from Treblle's site.
-
-The API key can be found in [User settings](https://treblle.com/users/settings).
-And the Project ID can be found in your project settings, you can find your projects in [Treblle's Dashboard](https://treblle.com/dashboard).
+## Support
+If you have problems adding, installing or using Treblle feel free to reach out via <https://treblle.com> or contact vedran@flip.hr and we will make sure to do a FREE integration for you. 
 
 ## License
-
-[MIT](https://github.com/Treblle/treblle-node/blob/master/LICENSE)
+Copyright 2020, Treblle. Licensed under the MIT license:
+http://www.opensource.org/licenses/mit-license.php
