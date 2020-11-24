@@ -18,7 +18,6 @@ Don't forget to load the required JS modules in your app.js like so:
 
 ```js
 const express = require("express");
-const router = express.Router();
 const { useTreblle } = require("treblle");
 ```
 
