@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Middleware for Treblle integration",
   "main": "index.js",
   "directories": {
@@ -26,6 +26,8 @@
   },
   "homepage": "https://github.com/Treblle/treblle-node#readme",
   "dependencies": {
-    "node-fetch": "^2.6.1"
+    "node-fetch": "^2.6.1",
+    "stack-trace": "0.0.10",
+    "finalhandler": "~1.1.2"
   }
 }

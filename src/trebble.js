@@ -1,17 +1,77 @@
-const fetch = require("node-fetch")
 const os = require("os");
 const url = require("url");
+const fetch = require("node-fetch");
+const stackTrace = require("stack-trace");
+const finalhandler = require("finalhandler");
 
 /**
  * Adds the trebble middleware to the app.
  *
- * @param {obj} app Express app
- * @param {obj} settings
+ * @param {object} app Express app
+ * @param {object} settings
  * @param {string} settings.apiKey Trebble API key
  * @param {string} settings.projectId Trebble Project ID
  */
 const useTreblle = function (app, { apiKey, projectId }) {
-  function trebbleMiddleware(req, res, next) {
+  patchApp(app, { apiKey, projectId });
+  app.use(trebbleMiddleware(apiKey, projectId));
+
+  return app;
+};
+
+/**
+ * Takes the express app and overrides it's methods
+ * so we can integrate Treblle middleware into it.
+ *
+ * @param {object} app Express app
+ */
+function patchApp(app, { apiKey, projectId }) {
+  // we need to overwrite the default send to be able to access the response body
+  const originalSend = app.response.send;
+  app.response.send = function sendOverWrite(body) {
+    originalSend.call(this, body);
+    this.__treblle_body_response = body;
+  };
+
+  // We override ExpressJS's app.handle function to avoid having to register our own error handling middleware,
+  // This way we do things a bit more hacky but the user doesn't have to register 2 middlewares: a regular one and a error handling one.
+  app.handle = function handle(req, res, callback) {
+    var router = this._router;
+    let self = this;
+
+    function expandedLogError(error) {
+      sendPayloadToTrebble(req, res, {
+        error,
+        apiKey,
+        projectId,
+        // in case of error the request time will be faulty
+        requestStartTime: process.hrtime(),
+      });
+
+      logerror.call(self, error);
+    }
+
+    // final handler
+    var done =
+      callback ||
+      finalhandler(req, res, {
+        env: this.get("env"),
+        onerror: expandedLogError,
+      });
+
+    // no routes
+    if (!router) {
+      debug("no routes defined on app");
+      done();
+      return;
+    }
+
+    router.handle(req, res, done);
+  };
+}
+
+function trebbleMiddleware(apiKey, projectId) {
+  return function _trebbleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
 
@@ -21,46 +81,35 @@ const useTreblle = function (app, { apiKey, projectId }) {
       }
 
       res.on("finish", function () {
-        let trebllePayload = generateTrebllePayload(req, res, {
+        if (
+          res.statusCode === 500 ||
+          res.statusMessage === "Internal Server Error"
+        ) {
+          // This prevents duplicate payload sending to Treblle API in case we have an error.
+          // The error will get caught by the app.handle's error handler.
+          return next();
+        }
+
+        sendPayloadToTrebble(req, res, {
           apiKey,
           projectId,
           requestStartTime,
         });
-
-        fetch("https://rocknrolla.treblle.com", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-          },
-          body: JSON.stringify(trebllePayload),
-        });
       });
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
     } finally {
-      next();
+      next && next();
     }
-  }
-
-  // we need to overwrite the default send to be ablle to access it
-  const originalSend = app.response.send;
-  app.response.send = function sendOverWrite(body) {
-    originalSend.call(this, body);
-    this.__treblle_body_response = body;
   };
-
-  app.use(trebbleMiddleware);
-
-  return app;
-};
+}
 
 /**
  * Prepares the payload which is sent to Treblle.
  *
- * @param {obj} Express request object
- * @param {obj} Express response object
- * @param {obj} settings
+ * @param {object} Express request object
+ * @param {object} Express response object
+ * @param {object} settings
  * @param {string} settings.apiKey Treblle API Key
  * @param {string} settings.projectId Treblle Project ID
  * @param {number[]} settings.requestStartTime when the request started
@@ -68,7 +117,7 @@ const useTreblle = function (app, { apiKey, projectId }) {
 const generateTrebllePayload = function (
   req,
   res,
-  { apiKey, projectId, requestStartTime }
+  { apiKey, projectId, requestStartTime, error }
 ) {
   const requestBody = maskSensitiveValues(req.body);
   let responseBody = res.__treblle_body_response;
@@ -87,6 +136,21 @@ const generateTrebllePayload = function (
   const protocol = `${req.protocol.toUpperCase()}/${req.httpVersion}`;
 
   res.__treblle_body_response = null;
+
+  let errors = [];
+  if (error) {
+    const trace = stackTrace.parse(error);
+
+    errors = [
+      {
+        source: "onException",
+        type: "UNHANDLED_EXCEPTION",
+        message: error.message,
+        file: trace[0].getFileName(),
+        line: trace[0].getLineNumber(),
+      },
+    ];
+  }
 
   let dataToSend = {
     api_key: apiKey,
@@ -122,33 +186,53 @@ const generateTrebllePayload = function (
         headers: responseHeaders,
         code: res.statusCode,
         size: res._contentLength,
-        load_time: getLoadTime(requestStartTime).toLocaleString(),
+        load_time: getRequestDuration(requestStartTime),
         body: responseBody !== undefined ? responseBody : null,
       },
-      errors: [],
+      errors: errors,
     },
   };
 
   return dataToSend;
 };
 
+function sendPayloadToTrebble(
+  req,
+  res,
+  { apiKey, projectId, requestStartTime, error }
+) {
+  let trebllePayload = generateTrebllePayload(req, res, {
+    apiKey,
+    projectId,
+    requestStartTime,
+    error,
+  });
+
+  fetch("https://rocknrolla.treblle.com", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+    },
+    body: JSON.stringify(trebllePayload),
+  });
+}
+
 /**
- * Calculates the request duration in microseconds.
+ * Calculates the request duration.
  *
  * @param {number[]} startTime
  * @returns {number}
  */
-function getLoadTime(startTime) {
+function getRequestDuration(startTime) {
   const NS_PER_SEC = 1e9;
   const NS_TO_MICRO = 1e3;
   const diff = process.hrtime(startTime);
 
-  return (diff[0] * NS_PER_SEC + diff[1]) / NS_TO_MICRO;
-}
+  const microseconds = (diff[0] * NS_PER_SEC + diff[1]) / NS_TO_MICRO;
 
-module.exports = {
-  useTreblle,
-};
+  return Math.ceil(microseconds);
+}
 
 const fieldsToMask = [
   "password",
@@ -207,3 +291,12 @@ function getRequestUrl(req) {
     pathname: req.originalUrl,
   });
 }
+
+function logerror(err) {
+  /* istanbul ignore next */
+  if (this.get("env") !== "test") console.error(err.stack || err.toString());
+}
+
+module.exports = {
+  useTreblle,
+};
