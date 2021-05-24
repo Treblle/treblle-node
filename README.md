@@ -1,6 +1,17 @@
-
 # Treblle for Node
-Treblle makes it super easy to understand what’s going on with your APIs and the apps that use them. To get started with Treblle create a FREE account on <https://treblle.com>.
+
+[![Latest Version](https://img.shields.io/npm/v/treblle)](https://img.shields.io/npm/v/treblle)
+[![Total Downloads](https://img.shields.io/npm/dt/treblle)](https://img.shields.io/npm/dt/treblle)
+[![MIT Licence](https://img.shields.io/npm/l/treblle)](LICENSE.md)
+
+Treblle makes it super easy to understand what’s going on with your APIs and the apps that use them. Just by adding Treblle to your API out of the box you get:
+* Real-time API monitoring and logging
+* Auto-generated API docs with OAS support
+* API analytics
+* Quality scoring
+* One-click testing
+* API managment on the go
+* and more...
 
 ## Requirements
 * nodejs
@@ -10,7 +21,7 @@ Treblle makes it super easy to understand what’s going on with your APIs and t
 * [`node-fetch`](https://www.npmjs.com/package/node-fetch)
 
 ## Installation
-You can install Treblle via [NPM](https://www.npmjs.com/). Simply run the following command:
+You can install Treblle for Node via [NPM](https://www.npmjs.com/). Simply run the following command:
 ```bash
 $ npm install treblle
 ```
@@ -22,7 +33,7 @@ const { useTreblle } = require("treblle");
 ```
 
 ## Getting started
-The first thing you need to do is create a FREE account on <https://treblle.com> to get an API key and Project ID. After that all you need to do is initialize Treblle in your **app.js** file like so: 
+Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so: 
 
 ```js
 const app = express();
@@ -36,8 +47,8 @@ useTreblle(app, {
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
 
 ## Support
-If you have problems adding, installing or using Treblle feel free to reach out via <https://treblle.com> or contact vedran@flip.hr and we will make sure to do a FREE integration for you. 
+If you have problems of any kind feel free to reach out via <https://treblle.com> or email vedran@treblle.com and we'll do our best to help you out.
 
 ## License
-Copyright 2020, Treblle. Licensed under the MIT license:
+Copyright 2021, Treblle Limited. Licensed under the MIT license:
 http://www.opensource.org/licenses/mit-license.php
