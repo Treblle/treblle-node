@@ -46,6 +46,7 @@ useTreblle(app, {
 ```
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
 
+
 ### Running Treblle only in production
 If you want to run Treblle only in production, you can rely on the environment variables, or use a similar approach via config.
 
@@ -59,6 +60,17 @@ if (process.env.NODE_ENV === "production") {
     projectId: "_YOUR_PROJECT_ID_",
   });
 }
+```
+
+### Need to hide additional fields?
+If you want to expand the list of fields you want to hide, you can pass property names you want to hide by using the `additionalFieldsToMask` setting like in the example below.
+
+```js
+useTreblle(app, {
+    apiKey: "_YOUR_API_KEY_",
+    projectId: "_YOUR_PROJECT_ID_",
+    additionalFieldsToMask: ["secretField", "highlySensitiveField"]
+  });
 ```
 
 ## Support

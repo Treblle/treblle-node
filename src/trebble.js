@@ -11,10 +11,13 @@ const finalhandler = require("finalhandler");
  * @param {object} settings
  * @param {string} settings.apiKey Trebble API key
  * @param {string} settings.projectId Trebble Project ID
+ * @param {string[]?} settings.additionalFieldsToMask specificy additional fields to hide
+ * @returns {object} updated Express app
  */
-const useTreblle = function (app, { apiKey, projectId }) {
-  patchApp(app, { apiKey, projectId });
-  app.use(trebbleMiddleware(apiKey, projectId));
+const useTreblle = function (app, { apiKey, projectId, additionalFieldsToMask = []}) {
+  const fieldsToMask = generateFieldsToMask(additionalFieldsToMask)
+  patchApp(app, { apiKey, projectId, fieldsToMask });
+  app.use(trebbleMiddleware(apiKey, projectId, fieldsToMask));
 
   return app;
 };
@@ -24,8 +27,13 @@ const useTreblle = function (app, { apiKey, projectId }) {
  * so we can integrate Treblle middleware into it.
  *
  * @param {object} app Express app
+ * @param {object} settings
+ * @param {string} settings.apiKey Trebble API key
+ * @param {string} settings.projectId Trebble Project ID
+ * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
+ * @returns {undefined}
  */
-function patchApp(app, { apiKey, projectId }) {
+function patchApp(app, { apiKey, projectId, fieldsToMaskMap }) {
   // we need to overwrite the default send to be able to access the response body
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
@@ -44,6 +52,7 @@ function patchApp(app, { apiKey, projectId }) {
         error,
         apiKey,
         projectId,
+        fieldsToMaskMap,
         // in case of error the request time will be faulty
         requestStartTime: process.hrtime(),
       });
@@ -70,7 +79,7 @@ function patchApp(app, { apiKey, projectId }) {
   };
 }
 
-function trebbleMiddleware(apiKey, projectId) {
+function trebbleMiddleware(apiKey, projectId, fieldsToMaskMap) {
   return function _trebbleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
@@ -94,6 +103,7 @@ function trebbleMiddleware(apiKey, projectId) {
           apiKey,
           projectId,
           requestStartTime,
+          fieldsToMaskMap,
         });
       });
     } catch (err) {
@@ -117,9 +127,9 @@ function trebbleMiddleware(apiKey, projectId) {
 const generateTrebllePayload = function (
   req,
   res,
-  { apiKey, projectId, requestStartTime, error }
+  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
 ) {
-  const requestBody = maskSensitiveValues(req.body);
+  const requestBody = maskSensitiveValues(req.body, fieldsToMaskMap);
   let responseBody = res.__treblle_body_response;
 
   const responseHeaders = res.getHeaders();
@@ -127,7 +137,7 @@ const generateTrebllePayload = function (
     // We should be able to parse this, but you never know if users will try doing something weird...
     try {
       responseBody = JSON.parse(res.__treblle_body_response);
-      responseBody = maskSensitiveValues(responseBody);
+      responseBody = maskSensitiveValues(responseBody, fieldsToMaskMap);
     } catch {
       // do nothing if we can't parse the response, in this case we'll have the response's original values untouched
     }
@@ -199,13 +209,14 @@ const generateTrebllePayload = function (
 function sendPayloadToTrebble(
   req,
   res,
-  { apiKey, projectId, requestStartTime, error }
+  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
     apiKey,
     projectId,
     requestStartTime,
     error,
+    fieldsToMaskMap
   });
 
   fetch("https://rocknrolla.treblle.com", {
@@ -250,30 +261,48 @@ const fieldsToMask = [
 ];
 
 /**
+ * Generates an object of fields to mask.
+ *
+ * We'll use an object because it's faster to check if a key exists in an object,
+ * then it is to check if the key exists in an array.
+ *
+ * @param {string[]?} additionalFieldsToMask
+ * @returns {object}
+ */
+function generateFieldsToMask(additionalFieldsToMask = []) {
+  const fields = [...fieldsToMask, ...additionalFieldsToMask];
+  const fieldsMap = fields.reduce((acc, field) => {
+    acc[field] = true
+    return acc
+  }, {});
+  return fieldsMap;
+}
+
+/**
  * Takes an object representing the payload and masks its sensitive fields.
  *
  * @param {object} payloadObject
  * @returns {object}
  */
-function maskSensitiveValues(payloadObject) {
+function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
   if (typeof payloadObject !== "object") return payloadObject;
   if (Array.isArray(payloadObject)) {
-    return payloadObject.map(maskSensitiveValues);
+    return payloadObject.map(val => maskSensitiveValues(val, fieldsToMaskMap));
   }
 
   let objectToMask = { ...payloadObject };
 
   let safeObject = Object.keys(objectToMask).reduce(function (acc, propName) {
     if (typeof objectToMask[propName] === "string") {
-      if (fieldsToMask.includes(propName)) {
+      if (fieldsToMaskMap[propName] === true) {
         acc[propName] = "*".repeat(objectToMask[propName].length);
       } else {
         acc[propName] = objectToMask[propName];
       }
     } else if (Array.isArray(objectToMask[propName])) {
-      acc[propName] = objectToMask[propName].map(maskSensitiveValues);
+      acc[propName] = objectToMask[propName].map(val => maskSensitiveValues(val, fieldsToMaskMap));
     } else if (typeof objectToMask[propName] === "object") {
-      acc[propName] = maskSensitiveValues(objectToMask[propName]);
+      acc[propName] = maskSensitiveValues(objectToMask[propName], fieldsToMaskMap);
     } else {
       acc[propName] = objectToMask[propName];
     }
