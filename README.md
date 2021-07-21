@@ -33,21 +33,36 @@ const { useTreblle } = require("treblle");
 ```
 
 ## Getting started
-Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so: 
+Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so:
 
 ```js
 const app = express();
 app.use(express.json());
 
 useTreblle(app, {
-  apiKey: '_YOUR_API_KEY_',
-  projectId: '_YOUR_PROJECT_ID_',
+  apiKey: "_YOUR_API_KEY_",
+  projectId: "_YOUR_PROJECT_ID_",
 });
 ```
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
 
-### Need to hide additional fields?
 
+### Running Treblle only in production
+If you want to run Treblle only in production, you can rely on the environment variables, or use a similar approach via config.
+
+```js
+const app = express();
+app.use(express.json());
+
+if (process.env.NODE_ENV === "production") {
+  useTreblle(app, {
+    apiKey: "_YOUR_API_KEY_",
+    projectId: "_YOUR_PROJECT_ID_",
+  });
+}
+```
+
+### Need to hide additional fields?
 If you want to expand the list of fields you want to hide, you can pass property names you want to hide by using the `additionalFieldsToMask` setting like in the example below.
 
 ```js
