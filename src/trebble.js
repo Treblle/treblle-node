@@ -123,7 +123,8 @@ const generateTrebllePayload = function (
   let responseBody = res.__treblle_body_response;
 
   const responseHeaders = res.getHeaders();
-  if (responseHeaders["content-type"].includes("application/json")) {
+  const contentType = responseHeaders["content-type"] || ""
+  if (contentType.includes("application/json")) {
     // We should be able to parse this, but you never know if users will try doing something weird...
     try {
       responseBody = JSON.parse(res.__treblle_body_response);
