@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Middleware for Treblle integration",
   "main": "index.js",
   "directories": {
