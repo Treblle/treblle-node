@@ -1,4 +1,4 @@
-const { useTreblle } = require("./src/trebble");
+const { useTreblle } = require("./src/treblle");
 
 module.exports = {
   useTreblle,
