@@ -11,13 +11,14 @@ const finalhandler = require("finalhandler");
  * @param {object} settings
  * @param {string} settings.apiKey Trebble API key
  * @param {string} settings.projectId Trebble Project ID
- * @param {string[]?} settings.additionalFieldsToMask specificy additional fields to hide
+ * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
+ * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
-const useTreblle = function (app, { apiKey, projectId, additionalFieldsToMask = []}) {
-  const fieldsToMask = generateFieldsToMask(additionalFieldsToMask)
-  patchApp(app, { apiKey, projectId, fieldsToMask });
-  app.use(trebbleMiddleware(apiKey, projectId, fieldsToMask));
+const useTreblle = function (app, { apiKey, projectId, additionalFieldsToMask = [], showErrors = true}) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask)
+  patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
+  app.use(trebbleMiddleware({apiKey, projectId, fieldsToMaskMap, showErrors}));
 
   return app;
 };
@@ -33,7 +34,7 @@ const useTreblle = function (app, { apiKey, projectId, additionalFieldsToMask = 
  * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
  * @returns {undefined}
  */
-function patchApp(app, { apiKey, projectId, fieldsToMaskMap }) {
+function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
   // we need to overwrite the default send to be able to access the response body
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
@@ -55,6 +56,7 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap }) {
         fieldsToMaskMap,
         // in case of error the request time will be faulty
         requestStartTime: process.hrtime(),
+        showErrors,
       });
 
       logerror.call(self, error);
@@ -79,15 +81,10 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap }) {
   };
 }
 
-function trebbleMiddleware(apiKey, projectId, fieldsToMaskMap) {
+function trebbleMiddleware({apiKey, projectId, fieldsToMaskMap, showErrors}) {
   return function _trebbleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
-
-      const contentType = req.headers["content-type"] || "";
-      if (!contentType.includes("application/json")) {
-        return next();
-      }
 
       res.on("finish", function () {
         if (
@@ -104,6 +101,7 @@ function trebbleMiddleware(apiKey, projectId, fieldsToMaskMap) {
           projectId,
           requestStartTime,
           fieldsToMaskMap,
+          showErrors
         });
       });
     } catch (err) {
@@ -130,29 +128,40 @@ const generateTrebllePayload = function (
   { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
 ) {
   const requestBody = maskSensitiveValues(req.body, fieldsToMaskMap);
-  let responseBody = res.__treblle_body_response;
-
   const responseHeaders = res.getHeaders();
-  const contentType = responseHeaders["content-type"] || ""
-  if (contentType.includes("application/json")) {
-    // We should be able to parse this, but you never know if users will try doing something weird...
-    try {
-      responseBody = JSON.parse(res.__treblle_body_response);
-      responseBody = maskSensitiveValues(responseBody, fieldsToMaskMap);
-    } catch {
-      // do nothing if we can't parse the response, in this case we'll have the response's original values untouched
+
+  let errors = [];
+
+  // We should be able to parse this, but you never know if users will try doing something weird...
+  let responseBody
+  try {
+    let originalResponseBody = res.__treblle_body_response;
+    // if it's not parsed, try parsing it
+    if (typeof originalResponseBody === "string") {
+      let parsedResponseBody = JSON.parse(originalResponseBody);
+      responseBody = maskSensitiveValues(parsedResponseBody, fieldsToMaskMap)
+    } else if (typeof originalResponseBody === "object") {
+      responseBody = maskSensitiveValues(originalResponseBody, fieldsToMaskMap);
     }
+  } catch {
+    // if we can't parse the body we'll leave it empty and set an error
+    errors.push({
+      source: "onShutdown",
+      type: "INVALID_JSON",
+      message: "Invalid JSON format",
+      file: null,
+      line: null,
+    })
   }
 
   const protocol = `${req.protocol.toUpperCase()}/${req.httpVersion}`;
 
   res.__treblle_body_response = null;
 
-  let errors = [];
   if (error) {
     const trace = stackTrace.parse(error);
 
-    errors = [
+    errors.push([
       {
         source: "onException",
         type: "UNHANDLED_EXCEPTION",
@@ -160,7 +169,7 @@ const generateTrebllePayload = function (
         file: trace[0].getFileName(),
         line: trace[0].getLineNumber(),
       },
-    ];
+    ]);
   }
 
   let dataToSend = {
@@ -210,7 +219,7 @@ const generateTrebllePayload = function (
 function sendPayloadToTrebble(
   req,
   res,
-  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
+  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap, showErrors }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
     apiKey,
@@ -227,7 +236,45 @@ function sendPayloadToTrebble(
       "x-api-key": apiKey,
     },
     body: JSON.stringify(trebllePayload),
+  })
+  .then(response => {
+    if (showErrors && response.ok === false) {
+      logTreblleResponseError(response)
+    }
+  }, error => {
+    if (showErrors) {
+      logRequestFailed(error)
+    }
+
   });
+}
+
+async function logTreblleResponseError(response) {
+  try {
+    const responseBody = await response.json();
+    logError(response, responseBody);
+    return;
+  } catch (_error) {
+    // ignore _error here, it means the response wasn't JSON
+  }
+
+  try {
+    const responseBody = await response.text();
+    logError(response, responseBody);
+    return;
+  } catch (_error) {
+    // ignore _error here, it means the response wasn't text
+  }
+
+  logError(response)
+}
+
+function logError(response, responseBody) {
+  console.log(`[error] Sending data to Treblle failed - status: ${response.statusText} (${response.status})`, responseBody);
+}
+
+function logRequestFailed(error) {
+  console.error("[error] Sending data to Treblle failed (it's possibly a network error)", error);
 }
 
 /**
@@ -270,7 +317,7 @@ const fieldsToMask = [
  * @param {string[]?} additionalFieldsToMask
  * @returns {object}
  */
-function generateFieldsToMask(additionalFieldsToMask = []) {
+function generateFieldsToMaskMap(additionalFieldsToMask = []) {
   const fields = [...fieldsToMask, ...additionalFieldsToMask];
   const fieldsMap = fields.reduce((acc, field) => {
     acc[field] = true
