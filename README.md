@@ -73,6 +73,17 @@ useTreblle(app, {
   });
 ```
 
+### Logging errors
+For easier debugging when sending the data to Treblle errors are visible by default, you can control it via the `showErrors` flag, you can disable the errors with `showErrors` set to `false`:
+
+```js
+useTreblle(app, {
+    apiKey: "_YOUR_API_KEY_",
+    projectId: "_YOUR_PROJECT_ID_",
+    showErrors: false
+  });
+```
+
 ## Support
 If you have problems of any kind feel free to reach out via <https://treblle.com> or email vedran@treblle.com and we'll do our best to help you out.
 
