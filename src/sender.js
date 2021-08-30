@@ -14,14 +14,17 @@ const stackTrace = require("stack-trace");
  * @param {string} settings.projectId Treblle Project ID
  * @param {number[]} settings.requestStartTime when the request started
  */
- const generateTrebllePayload = function (
+const generateTrebllePayload = function (
   req,
   res,
   { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
 ) {
   const payload = req.method === "GET" ? req.query : req.body;
   const parsedPayload = getPayload(payload);
-  const maskedRequestPayload = maskSensitiveValues(parsedPayload, fieldsToMaskMap);
+  const maskedRequestPayload = maskSensitiveValues(
+    parsedPayload,
+    fieldsToMaskMap
+  );
 
   const responseHeaders = res.getHeaders();
 
@@ -57,7 +60,7 @@ const stackTrace = require("stack-trace");
       message: "Invalid JSON format",
       file: null,
       line: null,
-    })
+    });
   }
 
   const protocol = `${req.protocol.toUpperCase()}/${req.httpVersion}`;
@@ -113,7 +116,7 @@ const stackTrace = require("stack-trace");
         code: res.statusCode,
         size: res._contentLength,
         load_time: getRequestDuration(requestStartTime),
-        body: responseBody !== undefined ? responseBody : null,
+        body: maskedResponseBody !== undefined ? maskedResponseBody : null,
       },
       errors: errors,
     },
@@ -121,7 +124,6 @@ const stackTrace = require("stack-trace");
 
   return dataToSend;
 };
-
 
 function sendPayloadToTrebble(
   req,
@@ -133,7 +135,7 @@ function sendPayloadToTrebble(
     projectId,
     requestStartTime,
     error,
-    fieldsToMaskMap
+    fieldsToMaskMap,
   });
 
   fetch("https://rocknrolla.treblle.com", {
@@ -152,7 +154,6 @@ function sendPayloadToTrebble(
     if (showErrors) {
       logRequestFailed(error)
     }
-
   });
 }
 
@@ -173,15 +174,21 @@ async function logTreblleResponseError(response) {
     // ignore _error here, it means the response wasn't text
   }
 
-  logError(response)
+  logError(response);
 }
 
 function logError(response, responseBody) {
-  console.log(`[error] Sending data to Treblle failed - status: ${response.statusText} (${response.status})`, responseBody);
+  console.log(
+    `[error] Sending data to Treblle failed - status: ${response.statusText} (${response.status})`,
+    responseBody
+  );
 }
 
 function logRequestFailed(error) {
-  console.error("[error] Sending data to Treblle failed (it's possibly a network error)", error);
+  console.error(
+    "[error] Sending data to Treblle failed (it's possibly a network error)",
+    error
+  );
 }
 
 /**
@@ -190,7 +197,7 @@ function logRequestFailed(error) {
  * @param {number[]} startTime
  * @returns {number}
  */
- function getRequestDuration(startTime) {
+function getRequestDuration(startTime) {
   const NS_PER_SEC = 1e9;
   const NS_TO_MICRO = 1e3;
   const diff = process.hrtime(startTime);
@@ -218,5 +225,5 @@ function getPayload(payload) {
 }
 
 module.exports = {
-  sendPayloadToTrebble
+  sendPayloadToTrebble,
 };

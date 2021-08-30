@@ -13,10 +13,15 @@ const { sendPayloadToTrebble } = require("./sender");
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
-const useTreblle = function (app, { apiKey, projectId, additionalFieldsToMask = [], showErrors = true}) {
-  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask)
+const useTreblle = function (
+  app,
+  { apiKey, projectId, additionalFieldsToMask = [], showErrors = true }
+) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
-  app.use(trebbleMiddleware({apiKey, projectId, fieldsToMaskMap, showErrors}));
+  app.use(
+    trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors })
+  );
 
   return app;
 };
@@ -79,7 +84,7 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
   };
 }
 
-function trebbleMiddleware({apiKey, projectId, fieldsToMaskMap, showErrors}) {
+function trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
   return function _trebbleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
@@ -99,7 +104,7 @@ function trebbleMiddleware({apiKey, projectId, fieldsToMaskMap, showErrors}) {
           projectId,
           requestStartTime,
           fieldsToMaskMap,
-          showErrors
+          showErrors,
         });
       });
     } catch (err) {

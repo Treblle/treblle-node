@@ -22,15 +22,14 @@ const fieldsToMask = [
  * @param {string[]?} additionalFieldsToMask
  * @returns {object}
  */
- function generateFieldsToMaskMap(additionalFieldsToMask = []) {
+function generateFieldsToMaskMap(additionalFieldsToMask = []) {
   const fields = [...fieldsToMask, ...additionalFieldsToMask];
   const fieldsMap = fields.reduce((acc, field) => {
-    acc[field] = true
-    return acc
+    acc[field] = true;
+    return acc;
   }, {});
   return fieldsMap;
 }
-
 
 /**
  * Takes an object representing the payload and masks its sensitive fields.
@@ -38,10 +37,13 @@ const fieldsToMask = [
  * @param {object} payloadObject
  * @returns {object}
  */
- function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
+function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
+  if (typeof payloadObject === null) return null;
   if (typeof payloadObject !== "object") return payloadObject;
   if (Array.isArray(payloadObject)) {
-    return payloadObject.map(val => maskSensitiveValues(val, fieldsToMaskMap));
+    return payloadObject.map((val) =>
+      maskSensitiveValues(val, fieldsToMaskMap)
+    );
   }
 
   let objectToMask = { ...payloadObject };
@@ -54,9 +56,14 @@ const fieldsToMask = [
         acc[propName] = objectToMask[propName];
       }
     } else if (Array.isArray(objectToMask[propName])) {
-      acc[propName] = objectToMask[propName].map(val => maskSensitiveValues(val, fieldsToMaskMap));
+      acc[propName] = objectToMask[propName].map((val) =>
+        maskSensitiveValues(val, fieldsToMaskMap)
+      );
     } else if (typeof objectToMask[propName] === "object") {
-      acc[propName] = maskSensitiveValues(objectToMask[propName], fieldsToMaskMap);
+      acc[propName] = maskSensitiveValues(
+        objectToMask[propName],
+        fieldsToMaskMap
+      );
     } else {
       acc[propName] = objectToMask[propName];
     }
