@@ -19,7 +19,10 @@ const stackTrace = require("stack-trace");
   res,
   { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
 ) {
-  const requestBody = maskSensitiveValues(req.body, fieldsToMaskMap);
+  const payload = req.method === "GET" ? req.query : req.body;
+  const parsedPayload = getPayload(payload);
+  const maskedRequestPayload = maskSensitiveValues(parsedPayload, fieldsToMaskMap);
+
   const responseHeaders = res.getHeaders();
 
   let errors = [];
@@ -92,7 +95,7 @@ const stackTrace = require("stack-trace");
         user_agent: req.get("user-agent"),
         method: req.method,
         headers: req.headers,
-        body: requestBody !== undefined ? requestBody : null,
+        body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
       },
       response: {
         headers: responseHeaders,
