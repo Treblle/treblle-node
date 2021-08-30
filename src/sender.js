@@ -201,11 +201,9 @@ function logRequestFailed(error) {
 }
 
 function getRequestUrl(req) {
-  return url.format({
-    protocol: req.protocol,
-    host: req.get("host"),
-    pathname: req.originalUrl,
-  });
+  const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+  return fullUrl;
+}
 }
 
 module.exports = {
