@@ -28,15 +28,26 @@ const stackTrace = require("stack-trace");
   let errors = [];
 
   // We should be able to parse this, but you never know if users will try doing something weird...
-  let responseBody
+  let maskedResponseBody;
   try {
     let originalResponseBody = res.__treblle_body_response;
-    // if it's not parsed, try parsing it
+    // if the response is streamed it could be a buffer
+    // so we'll convert it to a string first
+    if (Buffer.isBuffer(originalResponseBody)) {
+      originalResponseBody = originalResponseBody.toString("utf8");
+    }
+
     if (typeof originalResponseBody === "string") {
       let parsedResponseBody = JSON.parse(originalResponseBody);
-      responseBody = maskSensitiveValues(parsedResponseBody, fieldsToMaskMap)
+      maskedResponseBody = maskSensitiveValues(
+        parsedResponseBody,
+        fieldsToMaskMap
+      );
     } else if (typeof originalResponseBody === "object") {
-      responseBody = maskSensitiveValues(originalResponseBody, fieldsToMaskMap);
+      maskedResponseBody = maskSensitiveValues(
+        originalResponseBody,
+        fieldsToMaskMap
+      );
     }
   } catch {
     // if we can't parse the body we'll leave it empty and set an error
