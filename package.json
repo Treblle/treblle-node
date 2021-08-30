@@ -7,6 +7,7 @@
     "test": "test"
   },
   "scripts": {
+    "format": "prettier --write .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -26,8 +27,11 @@
   },
   "homepage": "https://github.com/Treblle/treblle-node#readme",
   "dependencies": {
+    "finalhandler": "~1.1.2",
     "node-fetch": "^2.6.1",
-    "stack-trace": "0.0.10",
-    "finalhandler": "~1.1.2"
+    "stack-trace": "0.0.10"
+  },
+  "devDependencies": {
+    "prettier": "^2.3.2"
   }
 }
