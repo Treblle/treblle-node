@@ -204,6 +204,17 @@ function getRequestUrl(req) {
   const fullUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
   return fullUrl;
 }
+
+function getPayload(payload) {
+  if (typeof payload === "object") return payload;
+  if (typeof payload === "string") {
+    try {
+      return JSON.parse(payload);
+    } catch (error) {
+      // if we can't parse it we'll just return null
+      return null;
+    }
+  }
 }
 
 module.exports = {
