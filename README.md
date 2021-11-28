@@ -40,7 +40,7 @@ const { useTreblle } = require("treblle");
 
 ## Getting started
 
-Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so:
+Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so for Express:
 
 ```js
 const app = express();
@@ -53,6 +53,71 @@ useTreblle(app, {
 ```
 
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
+
+### Koa integration
+
+If you're using koa, then you can enable Treblle like this:
+
+```js
+const Koa = require("koa");
+const KoaRouter = require("koa-router");
+const KoaBody = require("koa-body");
+const { koaTreblle } = require("treblle");
+
+const app = new Koa();
+const router = new KoaRouter();
+
+app.use(
+  koaTreblle({
+    apiKey: "_YOUR_API_KEY_",
+    projectId: "_YOUR_PROJECT_ID_",
+  })
+);
+```
+
+### Strapi integration
+
+Treblle has support for Strapi as well, to start using it you need to define the middleware first and then enable the middleware.
+
+This guide is based on the strapi quickstart project, you can create it and follow by running the following command:
+
+```sh
+npx create-strapi-app my-project --quickstart
+```
+
+First define the middleware in `middlewares/treblle/index.js` like this:
+
+```js
+const { strapiTreblle } = require("treblle");
+
+module.exports = (strapi) => {
+  return {
+    initialize() {
+      strapi.app.use(
+        strapiTreblle({
+          apiKey: "_YOUR_API_KEY_",
+          projectId: "_YOUR_PROJECT_ID_",
+        })
+      );
+    },
+  };
+};
+```
+
+Then enable the Treblle middleware like this:
+
+```js
+module.exports = {
+  load: {
+    before: ["boom", "treblle"],
+  },
+  settings: {
+    treblle: {
+      enabled: true,
+    },
+  },
+};
+```
 
 ### Running Treblle only in production
 

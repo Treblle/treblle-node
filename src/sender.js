@@ -1,8 +1,8 @@
 const { maskSensitiveValues } = require("./maskFields");
 const os = require("os");
-const url = require("url");
 const fetch = require("node-fetch");
 const stackTrace = require("stack-trace");
+const VERSION = require("../package.json").version;
 
 /**
  * Prepares the payload which is sent to Treblle.
@@ -13,6 +13,7 @@ const stackTrace = require("stack-trace");
  * @param {string} settings.apiKey Treblle API Key
  * @param {string} settings.projectId Treblle Project ID
  * @param {number[]} settings.requestStartTime when the request started
+ * @param {object} settings.fieldsToMaskMap map of fields to mask
  */
 const generateTrebllePayload = function (
   req,
@@ -65,6 +66,7 @@ const generateTrebllePayload = function (
 
   const protocol = `${req.protocol.toUpperCase()}/${req.httpVersion}`;
 
+  // get rid of the workaround body, we don't need it anymore
   res.__treblle_body_response = null;
 
   if (error) {
@@ -84,7 +86,7 @@ const generateTrebllePayload = function (
   let dataToSend = {
     api_key: apiKey,
     project_id: projectId,
-    version: 0.6,
+    version: VERSION,
     sdk: "node",
     data: {
       server: {
@@ -125,7 +127,131 @@ const generateTrebllePayload = function (
   return dataToSend;
 };
 
-function sendPayloadToTrebble(
+/**
+ * Prepares the payload which is sent to Treblle.
+ *
+ * @param {object} Koa context object
+ * @param {object} settings
+ * @param {string} settings.apiKey Treblle API Key
+ * @param {string} settings.projectId Treblle Project ID
+ * @param {number[]} settings.requestStartTime when the request started
+ * @param {object} settings.fieldsToMaskMap map of fields to mask
+ */
+const generateKoaTrebllePayload = function (
+  koaContext,
+  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
+) {
+  const payload =
+    koaContext.request.method === "GET"
+      ? koaContext.request.query
+      : koaContext.request.body;
+  const parsedPayload = getPayload(payload);
+  const maskedRequestPayload = maskSensitiveValues(
+    parsedPayload,
+    fieldsToMaskMap
+  );
+
+  const responseHeaders = koaContext.response.headers;
+
+  let errors = [];
+
+  // We should be able to parse this, but you never know if users will try doing something weird...
+  // TODO - figure out Koa buffers & streaming
+  let maskedResponseBody;
+  try {
+    let originalResponseBody = koaContext.response.body;
+    // if the response is streamed it could be a buffer
+    // so we'll convert it to a string first
+    if (Buffer.isBuffer(originalResponseBody)) {
+      originalResponseBody = originalResponseBody.toString("utf8");
+    }
+
+    if (typeof originalResponseBody === "string") {
+      let parsedResponseBody = JSON.parse(originalResponseBody);
+      maskedResponseBody = maskSensitiveValues(
+        parsedResponseBody,
+        fieldsToMaskMap
+      );
+    } else if (typeof originalResponseBody === "object") {
+      maskedResponseBody = maskSensitiveValues(
+        originalResponseBody,
+        fieldsToMaskMap
+      );
+    }
+  } catch {
+    // if we can't parse the body we'll leave it empty and set an error
+    errors.push({
+      source: "onShutdown",
+      type: "INVALID_JSON",
+      message: "Invalid JSON format",
+      file: null,
+      line: null,
+    });
+  }
+
+  const protocol = `${koaContext.request.protocol.toUpperCase()}/${
+    koaContext.request.req.httpVersion
+  }`;
+
+  if (error) {
+    const trace = stackTrace.parse(error);
+
+    errors.push([
+      {
+        source: "onException",
+        type: "UNHANDLED_EXCEPTION",
+        message: error.message,
+        file: trace[0].getFileName(),
+        line: trace[0].getLineNumber(),
+      },
+    ]);
+  }
+
+  let dataToSend = {
+    api_key: apiKey,
+    project_id: projectId,
+    version: VERSION,
+    sdk: "node",
+    data: {
+      server: {
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        os: {
+          name: os.platform(),
+          release: os.release(),
+          architecture: os.arch(),
+        },
+        software: null,
+        signature: null,
+        protocol: protocol,
+      },
+      language: {
+        name: "node",
+        version: process.version,
+      },
+      request: {
+        timestamp: new Date().toISOString().replace("T", " ").substr(0, 19),
+        ip: koaContext.request.ip,
+        url: getRequestUrl(koaContext.request),
+        user_agent: koaContext.request.header["user-agent"],
+        method: koaContext.request.method,
+        headers: koaContext.request.headers,
+        body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
+      },
+      response: {
+        headers: responseHeaders,
+        code: koaContext.response.status,
+        size: koaContext.response.length || null,
+        load_time: getRequestDuration(requestStartTime),
+        body: maskedResponseBody !== undefined ? maskedResponseBody : null,
+      },
+      errors: errors,
+    },
+  };
+
+  return dataToSend;
+};
+
+function sendExpressPayloadToTreblle(
   req,
   res,
   { apiKey, projectId, requestStartTime, error, fieldsToMaskMap, showErrors }
@@ -138,6 +264,25 @@ function sendPayloadToTrebble(
     fieldsToMaskMap,
   });
 
+  sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors });
+}
+
+function sendKoaPayloadToTreblle(
+  koaContext,
+  { apiKey, projectId, requestStartTime, fieldsToMaskMap, showErrors }
+) {
+  let trebllePayload = generateKoaTrebllePayload(koaContext, {
+    apiKey,
+    projectId,
+    requestStartTime,
+    error,
+    fieldsToMaskMap,
+  });
+
+  sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors });
+}
+
+function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
   fetch("https://rocknrolla.treblle.com", {
     method: "POST",
     headers: {
@@ -225,5 +370,6 @@ function getPayload(payload) {
 }
 
 module.exports = {
-  sendPayloadToTrebble,
+  sendExpressPayloadToTreblle,
+  sendKoaPayloadToTreblle,
 };

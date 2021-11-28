@@ -1,14 +1,17 @@
 const finalhandler = require("finalhandler");
 const { generateFieldsToMaskMap } = require("./maskFields");
-const { sendPayloadToTrebble } = require("./sender");
+const {
+  sendExpressPayloadToTreblle,
+  sendKoaPayloadToTreblle,
+} = require("./sender");
 
 /**
- * Adds the trebble middleware to the app.
+ * Adds the Treblle middleware to the app.
  *
  * @param {object} app Express app
  * @param {object} settings
- * @param {string} settings.apiKey Trebble API key
- * @param {string} settings.projectId Trebble Project ID
+ * @param {string} settings.apiKey Treblle API key
+ * @param {string} settings.projectId Treblle Project ID
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
  * @returns {object} updated Express app
@@ -20,7 +23,7 @@ const useTreblle = function (
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
   app.use(
-    trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors })
+    TreblleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors })
   );
 
   return app;
@@ -32,8 +35,8 @@ const useTreblle = function (
  *
  * @param {object} app Express app
  * @param {object} settings
- * @param {string} settings.apiKey Trebble API key
- * @param {string} settings.projectId Trebble Project ID
+ * @param {string} settings.apiKey Treblle API key
+ * @param {string} settings.projectId Treblle Project ID
  * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
  * @returns {undefined}
  */
@@ -42,6 +45,7 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
     originalSend.call(this, body);
+    // this is a workaround so we can access the response body
     this.__treblle_body_response = body;
   };
 
@@ -52,7 +56,7 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
     let self = this;
 
     function expandedLogError(error) {
-      sendPayloadToTrebble(req, res, {
+      sendExpressPayloadToTreblle(req, res, {
         error,
         apiKey,
         projectId,
@@ -84,8 +88,8 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
   };
 }
 
-function trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
-  return function _trebbleMiddlewareHandler(req, res, next) {
+function TreblleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
+  return function _TreblleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
 
@@ -99,7 +103,7 @@ function trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
           return next();
         }
 
-        sendPayloadToTrebble(req, res, {
+        sendExpressPayloadToTreblle(req, res, {
           apiKey,
           projectId,
           requestStartTime,
@@ -115,6 +119,102 @@ function trebbleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
   };
 }
 
+/**
+ * Treblle middleware for koa.
+ *
+ * @param {string} apiKey Treblle API key
+ * @param {string} projectId Treblle Project ID
+ * @param {string[]?} additionalFieldsToMask specify additional fields to hide
+ * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @returns {function} koa middleware function
+ */
+function koaTreblle({
+  apiKey,
+  projectId,
+  additionalFieldsToMask = [],
+  showErrors = true,
+}) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
+
+  return async function (ctx, next) {
+    return koaMiddlewareFn({
+      ctx,
+      next,
+      apiKey,
+      projectId,
+      fieldsToMaskMap,
+      showErrors,
+    });
+  };
+}
+
+/**
+ * Treblle middleware for strapi.
+ *
+ * @param {string} apiKey Treblle API key
+ * @param {string} projectId Treblle Project ID
+ * @param {string[]?} additionalFieldsToMask specify additional fields to hide
+ * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} ignoreAdminRoutes controls logging /admin routes
+ * @returns {function} koa middleware function
+ */
+function strapiTreblle({
+  apiKey,
+  projectId,
+  additionalFieldsToMask = [],
+  showErrors = true,
+  ignoreAdminRoutes = true,
+}) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
+
+  return async function (ctx, next) {
+    // option to ignore admin routes since everything is served via koa
+    if (ignoreAdminRoutes && ctx.request.url.startsWith("/admin")) {
+      return next();
+    }
+
+    return koaMiddlewareFn({
+      ctx,
+      next,
+      apiKey,
+      projectId,
+      fieldsToMaskMap,
+      showErrors,
+    });
+  };
+}
+
+async function koaMiddlewareFn({
+  ctx,
+  next,
+  apiKey,
+  projectId,
+  fieldsToMaskMap,
+  showErrors,
+}) {
+  const requestStartTime = process.hrtime();
+
+  try {
+    await next();
+    sendKoaPayloadToTreblle(ctx, {
+      apiKey,
+      projectId,
+      requestStartTime,
+      fieldsToMaskMap,
+      showErrors,
+    });
+  } catch (error) {
+    sendKoaPayloadToTreblle(ctx, {
+      apiKey,
+      projectId,
+      requestStartTime,
+      fieldsToMaskMap,
+      showErrors,
+    });
+    throw error;
+  }
+}
+
 function logerror(err) {
   /* istanbul ignore next */
   if (this.get("env") !== "test") console.error(err.stack || err.toString());
@@ -122,4 +222,6 @@ function logerror(err) {
 
 module.exports = {
   useTreblle,
+  koaTreblle,
+  strapiTreblle,
 };
