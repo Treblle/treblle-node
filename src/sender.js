@@ -269,7 +269,7 @@ function sendExpressPayloadToTreblle(
 
 function sendKoaPayloadToTreblle(
   koaContext,
-  { apiKey, projectId, requestStartTime, fieldsToMaskMap, showErrors }
+  { apiKey, projectId, requestStartTime, fieldsToMaskMap, showErrors, error }
 ) {
   let trebllePayload = generateKoaTrebllePayload(koaContext, {
     apiKey,

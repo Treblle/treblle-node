@@ -210,6 +210,7 @@ async function koaMiddlewareFn({
       requestStartTime,
       fieldsToMaskMap,
       showErrors,
+      error,
     });
     throw error;
   }
