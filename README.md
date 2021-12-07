@@ -104,7 +104,7 @@ module.exports = (strapi) => {
 };
 ```
 
-Then enable the Treblle middleware like this:
+Then enable the Treblle middleware in `config/middleware.js` like this:
 
 ```js
 module.exports = {
