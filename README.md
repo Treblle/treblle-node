@@ -108,9 +108,6 @@ Then enable the Treblle middleware in `config/middleware.js` like this:
 
 ```js
 module.exports = {
-  load: {
-    before: ["boom", "treblle"],
-  },
   settings: {
     treblle: {
       enabled: true,

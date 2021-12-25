@@ -155,7 +155,7 @@ function koaTreblle({
  * @param {string} projectId Treblle Project ID
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {boolean?} showErrors controls error logging when sending data to Treblle
- * @param {boolean?} ignoreAdminRoutes controls logging /admin routes
+ * @param {string[]} ignoreAdminRoutes controls logging /admin routes
  * @returns {function} koa middleware function
  */
 function strapiTreblle({
@@ -163,13 +163,18 @@ function strapiTreblle({
   projectId,
   additionalFieldsToMask = [],
   showErrors = true,
-  ignoreAdminRoutes = true,
+  ignoreAdminRoutes = [
+    "admin",
+    "content-type-builder",
+    "content-manager",
+  ]
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (ctx, next) {
     // option to ignore admin routes since everything is served via koa
-    if (ignoreAdminRoutes && ctx.request.url.startsWith("/admin")) {
+    const [_, path] = ctx.request.url.split("/");
+    if (ignoreAdminRoutes.includes(path)) {
       return next();
     }
 
