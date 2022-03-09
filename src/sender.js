@@ -72,15 +72,13 @@ const generateTrebllePayload = function (
   if (error) {
     const trace = stackTrace.parse(error);
 
-    errors.push([
-      {
+    errors.push({
         source: "onException",
         type: "UNHANDLED_EXCEPTION",
         message: error.message,
         file: trace[0].getFileName(),
         line: trace[0].getLineNumber(),
-      },
-    ]);
+    });
   }
 
   let dataToSend = {
@@ -196,15 +194,13 @@ const generateKoaTrebllePayload = function (
   if (error) {
     const trace = stackTrace.parse(error);
 
-    errors.push([
-      {
+    errors.push({
         source: "onException",
         type: "UNHANDLED_EXCEPTION",
         message: error.message,
         file: trace[0].getFileName(),
         line: trace[0].getLineNumber(),
-      },
-    ]);
+    });
   }
 
   let dataToSend = {
