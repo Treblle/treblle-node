@@ -163,11 +163,7 @@ function strapiTreblle({
   projectId,
   additionalFieldsToMask = [],
   showErrors = true,
-  ignoreAdminRoutes = [
-    "admin",
-    "content-type-builder",
-    "content-manager",
-  ]
+  ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 

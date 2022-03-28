@@ -73,11 +73,11 @@ const generateTrebllePayload = function (
     const trace = stackTrace.parse(error);
 
     errors.push({
-        source: "onException",
-        type: "UNHANDLED_EXCEPTION",
-        message: error.message,
-        file: trace[0].getFileName(),
-        line: trace[0].getLineNumber(),
+      source: "onException",
+      type: "UNHANDLED_EXCEPTION",
+      message: error.message,
+      file: trace[0].getFileName(),
+      line: trace[0].getLineNumber(),
     });
   }
 
@@ -195,11 +195,11 @@ const generateKoaTrebllePayload = function (
     const trace = stackTrace.parse(error);
 
     errors.push({
-        source: "onException",
-        type: "UNHANDLED_EXCEPTION",
-        message: error.message,
-        file: trace[0].getFileName(),
-        line: trace[0].getLineNumber(),
+      source: "onException",
+      type: "UNHANDLED_EXCEPTION",
+      message: error.message,
+      file: trace[0].getFileName(),
+      line: trace[0].getLineNumber(),
     });
   }
 
@@ -286,16 +286,18 @@ function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
       "x-api-key": apiKey,
     },
     body: JSON.stringify(trebllePayload),
-  })
-  .then(response => {
-    if (showErrors && response.ok === false) {
-      logTreblleResponseError(response)
+  }).then(
+    (response) => {
+      if (showErrors && response.ok === false) {
+        logTreblleResponseError(response);
+      }
+    },
+    (error) => {
+      if (showErrors) {
+        logRequestFailed(error);
+      }
     }
-  }, error => {
-    if (showErrors) {
-      logRequestFailed(error)
-    }
-  });
+  );
 }
 
 async function logTreblleResponseError(response) {
@@ -368,4 +370,5 @@ function getPayload(payload) {
 module.exports = {
   sendExpressPayloadToTreblle,
   sendKoaPayloadToTreblle,
+  sendPayloadToTreblleApi,
 };
