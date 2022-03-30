@@ -1,7 +1,7 @@
 {
   "name": "treblle",
-  "version": "1.0.2",
-  "description": "Middleware for Treblle integration",
+  "version": "1.1.0",
+  "description": "Treblle Javascript SDK",
   "main": "index.js",
   "directories": {
     "test": "test"
