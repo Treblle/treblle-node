@@ -8,8 +8,16 @@ const serviceWorkerTreblle = function ({
 }) {
   return (fetch) => {
     return (event) => {
-      const requestStartTime = Date.now();
-      const respondWith = event.respondWith.bind(event);
+      let requestStartTime;
+      let respondWith;
+      let requestClone;
+      try {
+        requestStartTime = Date.now();
+        requestClone = event.request.clone();
+        respondWith = event.respondWith.bind(event);
+      } catch (err) {
+        console.error("Error in Treblle middleware while cloning request", err)
+      }
       event.respondWith = function (responsePromise) {
         respondWith(
           (async function () {
@@ -18,7 +26,7 @@ const serviceWorkerTreblle = function ({
             try {
               response = await responsePromise;
               try {
-                await sendPayload(event.request.clone(), response.clone(), {
+                await sendPayload(requestClone, response.clone(), {
                   apiKey,
                   projectId,
                   additionalFieldsToMask,
@@ -29,13 +37,13 @@ const serviceWorkerTreblle = function ({
               } catch (err) {
                 // Just catch and log Treblle error - we do not want to crash app on Treblle's failure
                 console.error(
-                  "Error occurred when sending payload to Treblle. Have you set appropriate headers for your content type?",
+                  "Error occurred when sending payload to Treblle, have you set appropriate headers for your content type?",
                   err
                 );
               }
             } catch (err) {
               try {
-                await sendPayload(event.request.clone(), null, {
+                await sendPayload(requestClone, null, {
                   apiKey,
                   projectId,
                   additionalFieldsToMask,
@@ -62,7 +70,7 @@ const serviceWorkerTreblle = function ({
       } catch (err) {
         const requestEndTime = Date.now();
         error = err;
-        sendPayload(event.request.clone(), null, {
+        sendPayload(requestClone, null, {
           apiKey,
           projectId,
           additionalFieldsToMask,
@@ -71,7 +79,7 @@ const serviceWorkerTreblle = function ({
           error,
         }).catch((err) => {
           // Just catch and log Treblle error - we do not want to crash app on Treblle's failure
-          console.error("Error occurred when sending payload to Treblle.", err);
+          console.error("Error occurred when sending payload to Treblle", err);
         });
         throw error;
       }

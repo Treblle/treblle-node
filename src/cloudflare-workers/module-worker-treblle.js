@@ -10,7 +10,13 @@ const moduleWorkerTreblle = function ({
     return async (request, env, context) => {
       let response = null;
       let error = null;
+      let requestClone;
       const requestStartTime = Date.now();
+      try {
+        requestClone = request.clone();
+      } catch (err) {
+        console.error("Error in Treblle middleware while cloning request", err);
+      }
       try {
         response = await fetch(request, env, context);
       } catch (err) {
@@ -18,7 +24,7 @@ const moduleWorkerTreblle = function ({
       }
       const requestEndTime = Date.now();
       try {
-        await sendPayload(request.clone(), response ? response.clone() : null, {
+        await sendPayload(requestClone, response ? response.clone() : null, {
           apiKey,
           projectId,
           additionalFieldsToMask,
@@ -29,7 +35,7 @@ const moduleWorkerTreblle = function ({
       } catch (err) {
         // Just catch and log Treblle error - we do not want to crash app on Treblle's failure
         console.error(
-          "Error occurred when sending payload to Treblle. Have you set appropriate headers for your content type?",
+          "Error occurred when sending payload to Treblle, have you set appropriate headers for your content type?",
           err
         );
       }
