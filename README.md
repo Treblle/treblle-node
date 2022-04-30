@@ -157,8 +157,8 @@ const { serviceWorkerTreblle } = require("treblle");
 const treblle = serviceWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   projectId: "_YOUR_PROJECT_ID_",
-  additionalFieldsToMask = ['key1', 'key2'], // Optional
-  showErrors = true, // Optional, defaults to true
+  additionalFieldsToMask: ['key1', 'key2'], // Optional
+  showErrors: true, // Optional, defaults to true
 });
 
 // Wrap your 'fetch' handler inside returned Treblle function, so Treblle can listen for unhandled application errors in your code
@@ -191,8 +191,8 @@ import { moduleWorkerTreblle } from "treblle";
 const treblle = moduleWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   projectId: "_YOUR_PROJECT_ID_",
-  additionalFieldsToMask = ['key1', 'key2'], // Optional
-  showErrors = true, // Optional, defaults to true
+  additionalFieldsToMask: ['key1', 'key2'], // Optional
+  showErrors: true, // Optional, defaults to true
 });
 
 export default {
