@@ -108,11 +108,11 @@ const generateTrebllePayload = function (
         url: getRequestUrl(req),
         user_agent: req.get("user-agent"),
         method: req.method,
-        headers: req.headers,
+        headers: maskSensitiveValues(req.headers, fieldsToMaskMap),
         body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
       },
       response: {
-        headers: responseHeaders,
+        headers: maskSensitiveValues(responseHeaders, fieldsToMaskMap),
         code: res.statusCode,
         size: res._contentLength,
         load_time: getRequestDuration(requestStartTime),
@@ -230,11 +230,14 @@ const generateKoaTrebllePayload = function (
         url: getRequestUrl(koaContext.request),
         user_agent: koaContext.request.header["user-agent"],
         method: koaContext.request.method,
-        headers: koaContext.request.headers,
+        headers: maskSensitiveValues(
+          koaContext.request.headers,
+          fieldsToMaskMap
+        ),
         body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
       },
       response: {
-        headers: responseHeaders,
+        headers: maskSensitiveValues(responseHeaders, fieldsToMaskMap),
         code: koaContext.response.status,
         size: koaContext.response.length || null,
         load_time: getRequestDuration(requestStartTime),

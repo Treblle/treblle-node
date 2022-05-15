@@ -43,8 +43,14 @@ async function generatePayload(
     });
   }
 
-  const requestHeaders = parseHeaders(request && request.headers);
-  const responseHeaders = parseHeaders(response && response.headers);
+  const requestHeaders = maskSensitiveValues(
+    parseHeaders(request && request.headers),
+    additionalFieldsToMask
+  );
+  const responseHeaders = maskSensitiveValues(
+    parseHeaders(response && response.headers),
+    additionalFieldsToMask
+  );
 
   return {
     api_key: apiKey,
