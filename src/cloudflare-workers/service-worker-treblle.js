@@ -1,4 +1,5 @@
 const { sendPayload } = require("./send-payload");
+const { generateFieldsToMaskMap } = require("../maskFields");
 
 const serviceWorkerTreblle = function ({
   apiKey,
@@ -6,6 +7,7 @@ const serviceWorkerTreblle = function ({
   additionalFieldsToMask = [],
   showErrors = true,
 }) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
     return (event) => {
       let requestStartTime;
@@ -16,7 +18,7 @@ const serviceWorkerTreblle = function ({
         requestClone = event.request.clone();
         respondWith = event.respondWith.bind(event);
       } catch (err) {
-        console.error("Error in Treblle middleware while cloning request", err)
+        console.error("Error in Treblle middleware while cloning request", err);
       }
       event.respondWith = function (responsePromise) {
         respondWith(
@@ -29,7 +31,7 @@ const serviceWorkerTreblle = function ({
                 await sendPayload(requestClone, response.clone(), {
                   apiKey,
                   projectId,
-                  additionalFieldsToMask,
+                  fieldsToMaskMap,
                   showErrors,
                   requestExecutionTime: requestEndTime - requestStartTime,
                   error: null,
@@ -46,7 +48,7 @@ const serviceWorkerTreblle = function ({
                 await sendPayload(requestClone, null, {
                   apiKey,
                   projectId,
-                  additionalFieldsToMask,
+                  fieldsToMaskMap,
                   showErrors,
                   requestExecutionTime: requestEndTime - requestStartTime,
                   error: err,
@@ -73,7 +75,7 @@ const serviceWorkerTreblle = function ({
         sendPayload(requestClone, null, {
           apiKey,
           projectId,
-          additionalFieldsToMask,
+          fieldsToMaskMap,
           showErrors,
           requestExecutionTime: requestEndTime - requestStartTime,
           error,

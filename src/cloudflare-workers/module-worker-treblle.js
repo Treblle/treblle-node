@@ -1,4 +1,5 @@
 const { sendPayload } = require("./send-payload");
+const { generateFieldsToMaskMap } = require("../maskFields");
 
 const moduleWorkerTreblle = function ({
   apiKey,
@@ -6,6 +7,7 @@ const moduleWorkerTreblle = function ({
   additionalFieldsToMask = [],
   showErrors = true,
 }) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
     return async (request, env, context) => {
       let response = null;
@@ -27,7 +29,7 @@ const moduleWorkerTreblle = function ({
         await sendPayload(requestClone, response ? response.clone() : null, {
           apiKey,
           projectId,
-          additionalFieldsToMask,
+          fieldsToMaskMap,
           showErrors,
           requestExecutionTime: requestEndTime - requestStartTime,
           error,

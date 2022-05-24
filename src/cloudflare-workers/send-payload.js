@@ -7,7 +7,7 @@ async function sendPayload(
   {
     apiKey,
     projectId,
-    additionalFieldsToMask,
+    fieldsToMaskMap,
     showErrors = true,
     requestExecutionTime,
     error,
@@ -16,7 +16,7 @@ async function sendPayload(
   const trebllePayload = await generatePayload(request, response, {
     apiKey,
     projectId,
-    additionalFieldsToMask,
+    fieldsToMaskMap,
     requestExecutionTime,
     error,
   });

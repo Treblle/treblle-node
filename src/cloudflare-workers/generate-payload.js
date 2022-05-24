@@ -7,20 +7,20 @@ const { ContentType } = require("../consts");
 async function generatePayload(
   request,
   response,
-  { apiKey, projectId, additionalFieldsToMask, requestExecutionTime, error }
+  { apiKey, projectId, fieldsToMaskMap, requestExecutionTime, error }
 ) {
   const errors = [];
 
   const requestBody = await parseRequest(request);
   const maskedRequestBody = requestBody
-    ? maskSensitiveValues(requestBody, additionalFieldsToMask)
+    ? maskSensitiveValues(requestBody, fieldsToMaskMap)
     : null;
 
   let maskedResponseBody = null;
   try {
     const responseBody = response ? await parseResponse(response) : null;
     maskedResponseBody = responseBody
-      ? maskSensitiveValues(responseBody, additionalFieldsToMask)
+      ? maskSensitiveValues(responseBody, fieldsToMaskMap)
       : null;
   } catch (err) {
     errors.push({
@@ -43,8 +43,14 @@ async function generatePayload(
     });
   }
 
-  const requestHeaders = parseHeaders(request && request.headers);
-  const responseHeaders = parseHeaders(response && response.headers);
+  const requestHeaders = maskSensitiveValues(
+    parseHeaders(request && request.headers),
+    fieldsToMaskMap
+  );
+  const responseHeaders = maskSensitiveValues(
+    parseHeaders(response && response.headers),
+    fieldsToMaskMap
+  );
 
   return {
     api_key: apiKey,
