@@ -282,7 +282,19 @@ function sendKoaPayloadToTreblle(
 }
 
 function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
-  fetch("https://rocknrolla.treblle.com", {
+  let f;
+  if (typeof fetch === "function") {
+    f = fetch;
+  } else if (fetch && typeof fetch.default === "function") {
+    f = fetch.default;
+  } else {
+    if (showErrors) {
+      console.warn("Treblle error: fetch is not defined");
+    }
+    return;
+  }
+
+  f("https://rocknrolla.treblle.com", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
