@@ -34,4 +34,6 @@ declare module "treblle" {
   export function moduleWorkerTreblle(
     options: OptionsBase
   ): (request: Request) => Promise<Response> | Response;
+
+  export function useNestTreblle(app: any, options: OptionsBase): void;
 }

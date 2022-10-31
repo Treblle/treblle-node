@@ -222,6 +222,27 @@ Treblle package (currently) uses some Node native libraries for other integratio
 ...
 ```
 
+### NestJS (with Express)
+
+
+```js
+// NestJS's boostrap function
+
+const app = await NestFactory.create(AppModule);
+
+...
+
+const expressInstance = app.getHttpAdapter().getInstance();
+
+useNestTreblle(expressInstance, {
+  apiKey: "_YOUR_API_KEY_",
+  projectId: "_YOUR_PROJECT_ID_",
+});
+
+...
+```
+
+
 ### Running Treblle only in production
 
 If you want to run Treblle only in production, you can rely on the environment variables, or use a similar approach via config.
