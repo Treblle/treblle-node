@@ -30,6 +30,36 @@ const useTreblle = function (
 };
 
 /**
+ * Adds the Treblle middleware to the app.
+ *
+ * @param {object} app Express app
+ * @param {object} settings
+ * @param {string} settings.apiKey Treblle API key
+ * @param {string} settings.projectId Treblle Project ID
+ * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
+ * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
+ * @returns {object} updated Express app
+ */
+const useNestTreblle = function (
+  app,
+  { apiKey, projectId, additionalFieldsToMask = [], showErrors = true }
+) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
+  patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
+  app.use(
+    TreblleMiddleware({
+      apiKey,
+      projectId,
+      fieldsToMaskMap,
+      showErrors,
+      isNestjs: true,
+    })
+  );
+
+  return app;
+};
+
+/**
  * Takes the express app and overrides it's methods
  * so we can integrate Treblle middleware into it.
  *
@@ -88,15 +118,22 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
   };
 }
 
-function TreblleMiddleware({ apiKey, projectId, fieldsToMaskMap, showErrors }) {
+function TreblleMiddleware({
+  apiKey,
+  projectId,
+  fieldsToMaskMap,
+  showErrors,
+  isNestjs,
+}) {
   return function _TreblleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
 
       res.on("finish", function () {
         if (
-          res.statusCode === 500 ||
-          res.statusMessage === "Internal Server Error"
+          !isNestjs &&
+          (res.statusCode === 500 ||
+            res.statusMessage === "Internal Server Error")
         ) {
           // This prevents duplicate payload sending to Treblle API in case we have an error.
           // The error will get caught by the app.handle's error handler.
@@ -226,4 +263,5 @@ module.exports = {
   useTreblle,
   koaTreblle,
   strapiTreblle,
+  useNestTreblle,
 };

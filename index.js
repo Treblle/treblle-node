@@ -1,4 +1,9 @@
-const { useTreblle, koaTreblle, strapiTreblle } = require("./src/treblle");
+const {
+  useTreblle,
+  koaTreblle,
+  strapiTreblle,
+  useNestTreblle,
+} = require("./src/treblle");
 
 const {
   moduleWorkerTreblle,
@@ -14,4 +19,5 @@ module.exports = {
   strapiTreblle,
   moduleWorkerTreblle,
   serviceWorkerTreblle,
+  useNestTreblle,
 };
