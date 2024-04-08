@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "directories": {
@@ -20,7 +20,7 @@
     "treblle",
     "middleware"
   ],
-  "author": "Davor Badrov",
+  "author": "Treblle",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Treblle/treblle-node/issues"
