@@ -1,6 +1,6 @@
 {
-  "name": "treblle",
-  "version": "1.4.0",
+  "name": "@treblle/treblle",
+  "version": "1.4.1",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "directories": {
@@ -17,10 +17,12 @@
   "keywords": [
     "node",
     "express",
+    "koajs",
+    "nestjs",
     "treblle",
     "middleware"
   ],
-  "author": "Treblle",
+  "author": "Treblle<support@treblle.com>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Treblle/treblle-node/issues"
