@@ -19,7 +19,13 @@ const {
  */
 const useTreblle = function (
   app,
-  { apiKey, projectId, additionalFieldsToMask = [], showErrors = true }
+  {
+    apiKey,
+    projectId,
+    additionalFieldsToMask = [],
+    blacklistPaths = [],
+    showErrors = true,
+  }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
