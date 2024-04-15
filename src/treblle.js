@@ -69,7 +69,7 @@ const useNestTreblle = function (
     apiKey,
     projectId,
     fieldsToMaskMap,
-    showError,
+    showErrors,
     blacklistPaths,
   });
   app.use(

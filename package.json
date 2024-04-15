@@ -1,6 +1,6 @@
 {
-  "name": "@treblle/treblle",
-  "version": "1.4.1",
+  "name": "treblle",
+  "version": "1.4.2",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "directories": {
