@@ -4,6 +4,7 @@ declare module "treblle" {
     projectId: string;
     additionalFieldsToMask?: string[];
     showErrors?: boolean;
+    blacklistPaths?: string[]|RegExp;
   };
 
   type FetchEvent = any;
@@ -16,6 +17,7 @@ declare module "treblle" {
     apiKey: string,
     projectId: string,
     additionalFieldsToMask?: any[],
+    blacklistPaths?: string[]|RegExp,
     showErrors?: boolean
   ): Function;
 
@@ -24,6 +26,7 @@ declare module "treblle" {
     projectId: string,
     additionalFieldsToMask?: any[],
     showErrors?: boolean,
+    blacklistPaths?: string[]|RegExp,
     ignoreAdminRoutes?: string[]
   ): Function;
 
