@@ -7,6 +7,15 @@ declare module "treblle" {
     blocklistPaths?: string[]|RegExp;
   };
 
+  type StrapiOptionsBase = {
+    apiKey: string;
+    projectId: string;
+    additionalFieldsToMask?: string[];
+    showErrors?: boolean;
+    blocklistPaths?: string[]|RegExp;
+    ignoreAdminRoutes?: string[];
+  };
+
   type FetchEvent = any;
   type Request = any;
   type Response = any;
@@ -14,20 +23,11 @@ declare module "treblle" {
   export function useTreblle(app: any, options: any): void;
 
   export function koaTreblle(
-    apiKey: string,
-    projectId: string,
-    additionalFieldsToMask?: any[],
-    blocklistPaths?: string[]|RegExp,
-    showErrors?: boolean
+   options: OptionsBase
   ): Function;
 
   export function strapiTreblle(
-    apiKey: string,
-    projectId: string,
-    additionalFieldsToMask?: any[],
-    showErrors?: boolean,
-    blocklistPaths?: string[]|RegExp,
-    ignoreAdminRoutes?: string[]
+    options: StrapiOptionsBase
   ): Function;
 
   export function serviceWorkerTreblle(
