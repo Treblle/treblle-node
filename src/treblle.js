@@ -13,7 +13,7 @@ const {
  * @param {string} settings.apiKey Treblle API key
  * @param {string} settings.projectId Treblle Project ID
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
- * @param {(string[]|RegExp)?} settings.blacklistPaths specify additional paths to hide
+ * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
@@ -23,7 +23,7 @@ const useTreblle = function (
     apiKey,
     projectId,
     additionalFieldsToMask = [],
-    blacklistPaths = [],
+    blocklistPaths = [],
     showErrors = true,
   }
 ) {
@@ -34,7 +34,7 @@ const useTreblle = function (
       apiKey,
       projectId,
       fieldsToMaskMap,
-      blacklistPaths,
+      blocklistPaths,
       showErrors,
     })
   );
@@ -50,7 +50,7 @@ const useTreblle = function (
  * @param {string} settings.apiKey Treblle API key
  * @param {string} settings.projectId Treblle Project ID
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
- * @param {(string[]|RegExp)?} settings.blacklistPaths specify additional paths to hide
+ * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
@@ -60,7 +60,7 @@ const useNestTreblle = function (
     apiKey,
     projectId,
     additionalFieldsToMask = [],
-    blacklistPaths = [],
+    blocklistPaths = [],
     showErrors = true,
   }
 ) {
@@ -70,7 +70,7 @@ const useNestTreblle = function (
     projectId,
     fieldsToMaskMap,
     showErrors,
-    blacklistPaths,
+    blocklistPaths,
   });
   app.use(
     TreblleMiddleware({
@@ -78,7 +78,7 @@ const useNestTreblle = function (
       projectId,
       fieldsToMaskMap,
       showErrors,
-      blacklistPaths,
+      blocklistPaths,
       isNestjs: true,
     })
   );
@@ -149,7 +149,7 @@ function TreblleMiddleware({
   apiKey,
   projectId,
   fieldsToMaskMap,
-  blacklistPaths,
+  blocklistPaths,
   showErrors,
   isNestjs,
 }) {
@@ -168,23 +168,21 @@ function TreblleMiddleware({
           return next();
         }
 
-        // Check if the request path is blacklisted
-        const isPathBlacklisted =
-          blacklistPaths instanceof RegExp
-            ? blacklistPaths.test(req.path)
-            : blacklistPaths.some((path) => req.path.startsWith(`/${path}`));
+        // Check if the request path is blocked
+        const isPathBlocked =
+          blocklistPaths instanceof RegExp
+            ? blocklistPaths.test(req.path)
+            : blocklistPaths.some((path) => req.path.startsWith(`/${path}`));
 
-        if (isPathBlacklisted) {
-          return next();
+        if (!isPathBlocked) {
+          sendExpressPayloadToTreblle(req, res, {
+            apiKey,
+            projectId,
+            requestStartTime,
+            fieldsToMaskMap,
+            showErrors,
+          });
         }
-
-        sendExpressPayloadToTreblle(req, res, {
-          apiKey,
-          projectId,
-          requestStartTime,
-          fieldsToMaskMap,
-          showErrors,
-        });
       });
     } catch (err) {
       console.error(err);
@@ -200,7 +198,7 @@ function TreblleMiddleware({
  * @param {string} apiKey Treblle API key
  * @param {string} projectId Treblle Project ID
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
- * @param {(string[]|RegExp)?} blacklistPaths specify additional paths to hide
+ * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
  * @param {boolean?} showErrors controls error logging when sending data to Treblle
  * @returns {function} koa middleware function
  */
@@ -208,19 +206,19 @@ function koaTreblle({
   apiKey,
   projectId,
   additionalFieldsToMask = [],
-  blacklistPaths = [],
+  blocklistPaths = [],
   showErrors = true,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (ctx, next) {
-    // Check if the request path is blacklisted
-    const isPathBlacklisted =
-      blacklistPaths instanceof RegExp
-        ? blacklistPaths.test(ctx.request.url)
-        : blacklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
+    // Check if the request path is blocked
+    const isPathBlocked =
+      blocklistPaths instanceof RegExp
+        ? blocklistPaths.test(ctx.request.url)
+        : blocklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
 
-    if (isPathBlacklisted) {
+    if (isPathBlocked) {
       return next();
     }
 
@@ -241,7 +239,7 @@ function koaTreblle({
  * @param {string} apiKey Treblle API key
  * @param {string} projectId Treblle Project ID
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
- * @param {(string[]|RegExp)?} settings.blacklistPaths specify additional paths to hide
+ * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} showErrors controls error logging when sending data to Treblle
  * @param {string[]} ignoreAdminRoutes controls logging /admin routes
  * @returns {function} koa middleware function
@@ -250,7 +248,7 @@ function strapiTreblle({
   apiKey,
   projectId,
   additionalFieldsToMask = [],
-  blacklistPaths = [],
+  blocklistPaths = [],
   showErrors = true,
   ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
@@ -263,13 +261,13 @@ function strapiTreblle({
       return next();
     }
 
-    // Check if the request path is blacklisted
-    const isPathBlacklisted =
-      blacklistPaths instanceof RegExp
-        ? blacklistPaths.test(ctx.request.url)
-        : blacklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
+    // Check if the request path is blocked
+    const isPathBlocked =
+      blocklistPaths instanceof RegExp
+        ? blocklistPaths.test(ctx.request.url)
+        : blocklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
 
-    if (isPathBlacklisted) {
+    if (isPathBlocked) {
       return next();
     }
 

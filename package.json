@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "directories": {
