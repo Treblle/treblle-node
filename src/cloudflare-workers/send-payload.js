@@ -8,7 +8,7 @@ async function sendPayload(
     apiKey,
     projectId,
     fieldsToMaskMap,
-    showErrors = true,
+    showErrors = false,
     requestExecutionTime,
     error,
   }

@@ -24,7 +24,7 @@ const useTreblle = function (
     projectId,
     additionalFieldsToMask = [],
     blocklistPaths = [],
-    showErrors = true,
+    showErrors = false,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
@@ -61,7 +61,7 @@ const useNestTreblle = function (
     projectId,
     additionalFieldsToMask = [],
     blocklistPaths = [],
-    showErrors = true,
+    showErrors = false,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
@@ -207,7 +207,7 @@ function koaTreblle({
   projectId,
   additionalFieldsToMask = [],
   blocklistPaths = [],
-  showErrors = true,
+  showErrors = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
@@ -249,7 +249,7 @@ function strapiTreblle({
   projectId,
   additionalFieldsToMask = [],
   blocklistPaths = [],
-  showErrors = true,
+  showErrors = false,
   ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);

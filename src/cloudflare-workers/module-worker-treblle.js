@@ -5,7 +5,7 @@ const moduleWorkerTreblle = function ({
   apiKey,
   projectId,
   additionalFieldsToMask = [],
-  showErrors = true,
+  showErrors = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
