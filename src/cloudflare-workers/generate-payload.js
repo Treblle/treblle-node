@@ -78,6 +78,7 @@ async function generatePayload(
         method: request.method,
         headers: requestHeaders,
         body: maskedRequestBody ? maskedRequestBody : null,
+        route_path: getCloudflareRoutePath(request),
       },
       response: {
         headers: response ? responseHeaders : null,
@@ -160,6 +161,28 @@ const getSize = (item) => {
   } else {
     return 0;
   }
+};
+
+/**
+ * Extracts route path from Cloudflare Workers request
+ * Since Cloudflare Workers don't have built-in routing, 
+ * this checks for a custom route_path property set by the developer
+ * @param {Request} request Cloudflare Workers request object
+ * @returns {string|null} Route pattern or null if not available
+ */
+const getCloudflareRoutePath = (request) => {
+  // Check if developer has set a custom route_path property
+  if (request.route_path) {
+    return request.route_path;
+  }
+  
+  // Check if it's in the request headers (custom implementation)
+  const routeHeader = request.headers.get("x-route-path");
+  if (routeHeader) {
+    return routeHeader;
+  }
+  
+  return null;
 };
 
 module.exports = {

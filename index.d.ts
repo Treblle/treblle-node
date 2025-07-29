@@ -20,6 +20,11 @@ declare module "treblle" {
   type Request = any;
   type Response = any;
 
+  // Augment Request interface for Cloudflare Workers route_path support
+  interface CloudflareRequest extends Request {
+    route_path?: string;
+  }
+
   export function useTreblle(app: any, options: any): void;
 
   export function koaTreblle(

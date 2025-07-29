@@ -110,6 +110,7 @@ const generateTrebllePayload = function (
         method: req.method,
         headers: maskSensitiveValues(req.headers, fieldsToMaskMap),
         body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
+        route_path: getRoutePath(req),
       },
       response: {
         headers: maskSensitiveValues(responseHeaders, fieldsToMaskMap),
@@ -235,6 +236,7 @@ const generateKoaTrebllePayload = function (
           fieldsToMaskMap
         ),
         body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
+        route_path: getKoaRoutePath(koaContext),
       },
       response: {
         headers: maskSensitiveValues(responseHeaders, fieldsToMaskMap),
@@ -380,6 +382,73 @@ function getPayload(payload) {
       return null;
     }
   }
+}
+
+/**
+ * Extracts the route path pattern from Express/NestJS request
+ * @param {object} req Express request object
+ * @returns {string|null} Route pattern or null if not available
+ */
+function getRoutePath(req) {
+  let routePath = null;
+  
+  // Express/NestJS route pattern
+  if (req.route && req.route.path) {
+    routePath = req.route.path;
+  }
+  // Fallback: try to get from baseUrl + route
+  else if (req.baseUrl && req.route && req.route.path) {
+    routePath = req.baseUrl + req.route.path;
+  }
+  
+  // Transform Express :param syntax to OpenAPI {param} format
+  if (routePath) {
+    return transformToOpenAPIFormat(routePath);
+  }
+  
+  return null;
+}
+
+/**
+ * Extracts the route path pattern from Koa context
+ * @param {object} ctx Koa context object
+ * @returns {string|null} Route pattern or null if not available
+ */
+function getKoaRoutePath(ctx) {
+  let routePath = null;
+  
+  // Koa Router path pattern
+  if (ctx._matchedRoute) {
+    routePath = ctx._matchedRoute;
+  }
+  // Alternative: check for matched routes array
+  else if (ctx.matched && ctx.matched.length > 0) {
+    const lastMatch = ctx.matched[ctx.matched.length - 1];
+    if (lastMatch && lastMatch.path) {
+      routePath = lastMatch.path;
+    }
+  }
+  // Check for router layer path
+  else if (ctx.routerPath) {
+    routePath = ctx.routerPath;
+  }
+  
+  // Transform Koa :param syntax to OpenAPI {param} format
+  if (routePath) {
+    return transformToOpenAPIFormat(routePath);
+  }
+  
+  return null;
+}
+
+/**
+ * Transforms route paths from :param syntax to OpenAPI {param} format
+ * @param {string} routePath Route path with :param syntax
+ * @returns {string} Route path with {param} syntax
+ */
+function transformToOpenAPIFormat(routePath) {
+  // Transform :param to {param} and :param? to {param} (optional params)
+  return routePath.replace(/:([a-zA-Z_$][a-zA-Z0-9_$]*)\??/g, '{$1}');
 }
 
 module.exports = {
