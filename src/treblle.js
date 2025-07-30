@@ -3,6 +3,7 @@ const { generateFieldsToMaskMap } = require("./maskFields");
 const {
   sendExpressPayloadToTreblle,
   sendKoaPayloadToTreblle,
+  sendHonoPayloadToTreblle,
 } = require("./sender");
 
 /**
@@ -10,8 +11,8 @@ const {
  *
  * @param {object} app Express app
  * @param {object} settings
+ * @param {string} settings.sdkToken Treblle SDK token
  * @param {string} settings.apiKey Treblle API key
- * @param {string} settings.projectId Treblle Project ID
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
@@ -20,19 +21,19 @@ const {
 const useTreblle = function (
   app,
   {
+    sdkToken,
     apiKey,
-    projectId,
     additionalFieldsToMask = [],
     blocklistPaths = [],
     showErrors = false,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors });
+  patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, showErrors });
   app.use(
     TreblleMiddleware({
+      sdkToken,
       apiKey,
-      projectId,
       fieldsToMaskMap,
       blocklistPaths,
       showErrors,
@@ -47,8 +48,8 @@ const useTreblle = function (
  *
  * @param {object} app Express app
  * @param {object} settings
+ * @param {string} settings.sdkToken Treblle SDK token
  * @param {string} settings.apiKey Treblle API key
- * @param {string} settings.projectId Treblle Project ID
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
@@ -57,8 +58,8 @@ const useTreblle = function (
 const useNestTreblle = function (
   app,
   {
+    sdkToken,
     apiKey,
-    projectId,
     additionalFieldsToMask = [],
     blocklistPaths = [],
     showErrors = false,
@@ -66,16 +67,16 @@ const useNestTreblle = function (
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   patchApp(app, {
+    sdkToken,
     apiKey,
-    projectId,
     fieldsToMaskMap,
     showErrors,
     blocklistPaths,
   });
   app.use(
     TreblleMiddleware({
+      sdkToken,
       apiKey,
-      projectId,
       fieldsToMaskMap,
       showErrors,
       blocklistPaths,
@@ -92,12 +93,12 @@ const useNestTreblle = function (
  *
  * @param {object} app Express app
  * @param {object} settings
+ * @param {string} settings.sdkToken Treblle SDK token
  * @param {string} settings.apiKey Treblle API key
- * @param {string} settings.projectId Treblle Project ID
  * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
  * @returns {undefined}
  */
-function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
+function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, showErrors }) {
   // we need to overwrite the default send to be able to access the response body
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
@@ -115,8 +116,8 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
     function expandedLogError(error) {
       sendExpressPayloadToTreblle(req, res, {
         error,
+        sdkToken,
         apiKey,
-        projectId,
         fieldsToMaskMap,
         // in case of error the request time will be faulty
         requestStartTime: process.hrtime(),
@@ -146,8 +147,8 @@ function patchApp(app, { apiKey, projectId, fieldsToMaskMap, showErrors }) {
 }
 
 function TreblleMiddleware({
+  sdkToken,
   apiKey,
-  projectId,
   fieldsToMaskMap,
   blocklistPaths,
   showErrors,
@@ -176,8 +177,8 @@ function TreblleMiddleware({
 
         if (!isPathBlocked) {
           sendExpressPayloadToTreblle(req, res, {
+            sdkToken,
             apiKey,
-            projectId,
             requestStartTime,
             fieldsToMaskMap,
             showErrors,
@@ -195,16 +196,16 @@ function TreblleMiddleware({
 /**
  * Treblle middleware for koa.
  *
+ * @param {string} sdkToken Treblle SDK token
  * @param {string} apiKey Treblle API key
- * @param {string} projectId Treblle Project ID
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
  * @param {boolean?} showErrors controls error logging when sending data to Treblle
  * @returns {function} koa middleware function
  */
 function koaTreblle({
+  sdkToken,
   apiKey,
-  projectId,
   additionalFieldsToMask = [],
   blocklistPaths = [],
   showErrors = false,
@@ -225,8 +226,8 @@ function koaTreblle({
     return koaMiddlewareFn({
       ctx,
       next,
+      sdkToken,
       apiKey,
-      projectId,
       fieldsToMaskMap,
       showErrors,
     });
@@ -236,8 +237,8 @@ function koaTreblle({
 /**
  * Treblle middleware for strapi.
  *
+ * @param {string} sdkToken Treblle SDK token
  * @param {string} apiKey Treblle API key
- * @param {string} projectId Treblle Project ID
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} showErrors controls error logging when sending data to Treblle
@@ -245,8 +246,8 @@ function koaTreblle({
  * @returns {function} koa middleware function
  */
 function strapiTreblle({
+  sdkToken,
   apiKey,
-  projectId,
   additionalFieldsToMask = [],
   blocklistPaths = [],
   showErrors = false,
@@ -274,8 +275,8 @@ function strapiTreblle({
     return koaMiddlewareFn({
       ctx,
       next,
+      sdkToken,
       apiKey,
-      projectId,
       fieldsToMaskMap,
       showErrors,
     });
@@ -285,8 +286,8 @@ function strapiTreblle({
 async function koaMiddlewareFn({
   ctx,
   next,
+  sdkToken,
   apiKey,
-  projectId,
   fieldsToMaskMap,
   showErrors,
 }) {
@@ -295,16 +296,16 @@ async function koaMiddlewareFn({
   try {
     await next();
     sendKoaPayloadToTreblle(ctx, {
+      sdkToken,
       apiKey,
-      projectId,
       requestStartTime,
       fieldsToMaskMap,
       showErrors,
     });
   } catch (error) {
     sendKoaPayloadToTreblle(ctx, {
+      sdkToken,
       apiKey,
-      projectId,
       requestStartTime,
       fieldsToMaskMap,
       showErrors,
@@ -319,9 +320,117 @@ function logerror(err) {
   if (this.get("env") !== "test") console.error(err.stack || err.toString());
 }
 
+/**
+ * Treblle middleware for Hono.
+ *
+ * @param {string} sdkToken Treblle SDK token
+ * @param {string} apiKey Treblle API key
+ * @param {string[]?} additionalFieldsToMask specify additional fields to hide
+ * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
+ * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @returns {function} hono middleware function
+ */
+function honoTreblle({
+  sdkToken,
+  apiKey,
+  additionalFieldsToMask = [],
+  blocklistPaths = [],
+  showErrors = false,
+}) {
+  const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
+
+  return async function (c, next) {
+    // Check if the request path is blocked
+    const isPathBlocked =
+      blocklistPaths instanceof RegExp
+        ? blocklistPaths.test(c.req.url)
+        : blocklistPaths.some((path) => c.req.url.startsWith(`/${path}`));
+
+    if (isPathBlocked) {
+      return next();
+    }
+
+    return honoMiddlewareFn({
+      c,
+      next,
+      sdkToken,
+      apiKey,
+      fieldsToMaskMap,
+      showErrors,
+    });
+  };
+}
+
+async function honoMiddlewareFn({
+  c,
+  next,
+  sdkToken,
+  apiKey,
+  fieldsToMaskMap,
+  showErrors,
+}) {
+  const requestStartTime = process.hrtime();
+
+  try {
+    await next();
+    
+    // Capture response body for Hono
+    await captureHonoResponseBody(c);
+    
+    sendHonoPayloadToTreblle(c, {
+      sdkToken,
+      apiKey,
+      requestStartTime,
+      fieldsToMaskMap,
+      showErrors,
+    });
+  } catch (error) {
+    sendHonoPayloadToTreblle(c, {
+      sdkToken,
+      apiKey,
+      requestStartTime,
+      fieldsToMaskMap,
+      showErrors,
+      error,
+    });
+    throw error;
+  }
+}
+
+async function captureHonoResponseBody(c) {
+  try {
+    if (c.res && c.res.body) {
+      // Clone the response to read the body without consuming it
+      const clonedResponse = c.res.clone();
+      
+      // Try to read as text first
+      let responseBody;
+      try {
+        responseBody = await clonedResponse.text();
+      } catch {
+        // If text fails, try reading as arrayBuffer and convert
+        try {
+          const buffer = await clonedResponse.arrayBuffer();
+          responseBody = new TextDecoder().decode(buffer);
+        } catch {
+          // If all fails, leave it null
+          responseBody = null;
+        }
+      }
+      
+      // Store captured body for later access
+      c.__treblle_body_response = responseBody;
+    }
+  } catch (error) {
+    // If capture fails, continue without body data
+    c.__treblle_body_response = null;
+  }
+}
+
 module.exports = {
   useTreblle,
   koaTreblle,
   strapiTreblle,
   useNestTreblle,
+  honoTreblle,
 };

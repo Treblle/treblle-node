@@ -1,15 +1,15 @@
 declare module "treblle" {
   type OptionsBase = {
+    sdkToken: string;
     apiKey: string;
-    projectId: string;
     additionalFieldsToMask?: string[];
     showErrors?: boolean;
     blocklistPaths?: string[] | RegExp;
   };
 
   type StrapiOptionsBase = {
+    sdkToken: string;
     apiKey: string;
-    projectId: string;
     additionalFieldsToMask?: string[];
     showErrors?: boolean;
     blocklistPaths?: string[] | RegExp;
@@ -40,4 +40,6 @@ declare module "treblle" {
   ): (request: Request) => Promise<Response> | Response;
 
   export function useNestTreblle(app: any, options: OptionsBase): void;
+
+  export function honoTreblle(options: OptionsBase): Function;
 }

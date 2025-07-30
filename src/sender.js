@@ -6,6 +6,14 @@ const VERSION = require("../package.json").version;
 const http = require("http");
 const https = require("https");
 
+// Try to import Hono route helpers (optional dependency)
+let honoRouteHelpers = null;
+try {
+  honoRouteHelpers = require("hono/route");
+} catch (error) {
+  // Hono route helpers not available, will use fallback methods
+}
+
 // Cache expensive operations at module load
 const CACHED_OS_INFO = {
   name: os.platform(),
@@ -133,15 +141,15 @@ function checkPayloadSize(payload) {
  * @param {object} Express request object
  * @param {object} Express response object
  * @param {object} settings
- * @param {string} settings.apiKey Treblle API Key
- * @param {string} settings.projectId Treblle Project ID
+ * @param {string} settings.sdkToken Treblle SDK token
+ * @param {string} settings.apiKey Treblle API key
  * @param {number[]} settings.requestStartTime when the request started
  * @param {object} settings.fieldsToMaskMap map of fields to mask
  */
 const generateTrebllePayload = function (
   req,
   res,
-  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
 ) {
   const payload = req.method === "GET" ? req.query : req.body;
   const parsedPayload = getPayload(payload);
@@ -209,8 +217,8 @@ const generateTrebllePayload = function (
   }
 
   let dataToSend = {
-    api_key: apiKey,
-    project_id: projectId,
+    api_key: sdkToken,
+    project_id: apiKey,
     version: VERSION,
     sdk: "node",
     data: {
@@ -252,16 +260,139 @@ const generateTrebllePayload = function (
 /**
  * Prepares the payload which is sent to Treblle.
  *
+ * @param {object} Hono context object
+ * @param {object} settings
+ * @param {string} settings.sdkToken Treblle SDK token
+ * @param {string} settings.apiKey Treblle API key
+ * @param {number[]} settings.requestStartTime when the request started
+ * @param {object} settings.fieldsToMaskMap map of fields to mask
+ */
+const generateHonoTrebllePayload = function (
+  honoContext,
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
+) {
+  const payload =
+    honoContext.req.method === "GET"
+      ? honoContext.req.queries()
+      : honoContext.req.body;
+  const parsedPayload = getPayload(payload);
+  const sizeCheckedPayload = checkPayloadSize(parsedPayload);
+  const maskedRequestPayload = maskSensitiveValues(
+    sizeCheckedPayload,
+    fieldsToMaskMap
+  );
+
+  const responseHeaders = honoContext.res.headers;
+
+  let errors = [];
+
+  let maskedResponseBody;
+  let parsedResponseBody;
+  try {
+    let originalResponseBody = honoContext.__treblle_body_response;
+    // if the response is streamed it could be a buffer
+    // so we'll convert it to a string first
+    if (Buffer.isBuffer(originalResponseBody)) {
+      originalResponseBody = originalResponseBody.toString("utf8");
+    }
+
+    if (typeof originalResponseBody === "string") {
+      parsedResponseBody = JSON.parse(originalResponseBody);
+      const sizeCheckedResponseBody = checkPayloadSize(parsedResponseBody);
+      maskedResponseBody = maskSensitiveValues(
+        sizeCheckedResponseBody,
+        fieldsToMaskMap
+      );
+    } else if (typeof originalResponseBody === "object") {
+      const sizeCheckedResponseBody = checkPayloadSize(originalResponseBody);
+      maskedResponseBody = maskSensitiveValues(
+        sizeCheckedResponseBody,
+        fieldsToMaskMap
+      );
+    }
+  } catch {
+    // if we can't parse the body we'll leave it empty and set an error
+    errors.push({
+      source: "onShutdown",
+      type: "INVALID_JSON",
+      message: "Invalid JSON format",
+      file: null,
+      line: null,
+    });
+  }
+
+  // Hono uses HTTP/1.1 by default, but we'll try to detect version
+  const protocol = "HTTP/1.1";
+
+  if (error) {
+    const trace = stackTrace.parse(error);
+
+    errors.push({
+      source: "onException",
+      type: "UNHANDLED_EXCEPTION",
+      message: error.message,
+      file: trace[0].getFileName(),
+      line: trace[0].getLineNumber(),
+    });
+  }
+
+  let dataToSend = {
+    api_key: sdkToken,
+    project_id: apiKey,
+    version: VERSION,
+    sdk: "node",
+    data: {
+      server: {
+        timezone: CACHED_TIMEZONE,
+        os: CACHED_OS_INFO,
+        software: null,
+        signature: null,
+        protocol: protocol,
+      },
+      language: {
+        name: "node",
+        version: CACHED_NODE_VERSION,
+      },
+      request: {
+        timestamp: getCachedTimestamp(),
+        ip: getHonoClientIP(honoContext),
+        url: getHonoRequestUrl(honoContext),
+        user_agent: honoContext.req.header("user-agent"),
+        method: honoContext.req.method,
+        headers: maskSensitiveValues(
+          getHonoHeaders(honoContext.req),
+          fieldsToMaskMap
+        ),
+        body: maskedRequestPayload !== undefined ? maskedRequestPayload : null,
+        route_path: getHonoRoutePath(honoContext),
+      },
+      response: {
+        headers: maskSensitiveValues(getHonoResponseHeaders(honoContext.res), fieldsToMaskMap),
+        code: honoContext.res.status,
+        size: null, // Hono doesn't expose content length easily
+        load_time: getRequestDuration(requestStartTime),
+        body: maskedResponseBody !== undefined ? maskedResponseBody : null,
+      },
+      errors: errors,
+    },
+  };
+
+  return dataToSend;
+};
+
+/**
+ * Prepares the payload which is sent to Treblle.
+ *
  * @param {object} Koa context object
  * @param {object} settings
- * @param {string} settings.apiKey Treblle API Key
- * @param {string} settings.projectId Treblle Project ID
+ * @param {string} settings.sdkToken Treblle SDK token
+ * @param {string} settings.apiKey Treblle API key
  * @param {number[]} settings.requestStartTime when the request started
  * @param {object} settings.fieldsToMaskMap map of fields to mask
  */
 const generateKoaTrebllePayload = function (
   koaContext,
-  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
 ) {
   const payload =
     koaContext.request.method === "GET"
@@ -332,8 +463,8 @@ const generateKoaTrebllePayload = function (
   }
 
   let dataToSend = {
-    api_key: apiKey,
-    project_id: projectId,
+    api_key: sdkToken,
+    project_id: apiKey,
     version: VERSION,
     sdk: "node",
     data: {
@@ -378,32 +509,47 @@ const generateKoaTrebllePayload = function (
 function sendExpressPayloadToTreblle(
   req,
   res,
-  { apiKey, projectId, requestStartTime, error, fieldsToMaskMap, showErrors }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, showErrors }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
+    sdkToken,
     apiKey,
-    projectId,
     requestStartTime,
     error,
     fieldsToMaskMap,
   });
 
-  sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
 }
 
 function sendKoaPayloadToTreblle(
   koaContext,
-  { apiKey, projectId, requestStartTime, fieldsToMaskMap, showErrors, error }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, showErrors, error }
 ) {
   let trebllePayload = generateKoaTrebllePayload(koaContext, {
+    sdkToken,
     apiKey,
-    projectId,
     requestStartTime,
     error,
     fieldsToMaskMap,
   });
 
-  sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
+}
+
+function sendHonoPayloadToTreblle(
+  honoContext,
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, showErrors, error }
+) {
+  let trebllePayload = generateHonoTrebllePayload(honoContext, {
+    sdkToken,
+    apiKey,
+    requestStartTime,
+    error,
+    fieldsToMaskMap,
+  });
+
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
 }
 
 function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
@@ -579,6 +725,97 @@ function getKoaRoutePath(ctx) {
 }
 
 /**
+ * Extracts the route path pattern from Hono context
+ * @param {object} c Hono context object
+ * @returns {string|null} Route pattern or null if not available
+ */
+function getHonoRoutePath(c) {
+  let routePattern = null;
+
+  try {
+    // Fallback: Check deprecated routePath property in request (pre v4.8.0)
+    if (c.req && c.req.routePath) {
+      routePattern = c.req.routePath;
+    }
+    // Fallback: Check if context has routePath method
+    else if (c.routePath && typeof c.routePath === 'function') {
+      routePattern = c.routePath();
+    }
+    // Fallback: Check if context has routePath as property
+    else if (c.routePath && typeof c.routePath === 'string') {
+      routePattern = c.routePath;
+    }
+  } catch (error) {
+    // If route helpers fail, continue without route pattern
+    routePattern = null;
+  }
+
+  // Transform Hono :param syntax to OpenAPI {param} format
+  if (routePattern) {
+    return transformToOpenAPIFormat(routePattern);
+  }
+
+  return null;
+}
+
+/**
+ * Gets client IP from Hono context
+ * @param {object} c Hono context object
+ * @returns {string|null} Client IP address
+ */
+function getHonoClientIP(c) {
+  // Try to get IP from various Hono context sources
+  return (
+    c.req.header("x-forwarded-for")?.split(",")[0].trim() ||
+    c.req.header("x-real-ip") ||
+    c.req.header("cf-connecting-ip") ||
+    c.env?.REMOTE_ADDR ||
+    null
+  );
+}
+
+/**
+ * Gets request URL from Hono context
+ * @param {object} c Hono context object
+ * @returns {string} Request URL
+ */
+function getHonoRequestUrl(c) {
+  return c.req.url;
+}
+
+/**
+ * Gets headers from Hono request
+ * @param {object} req Hono request object
+ * @returns {object} Headers object
+ */
+function getHonoHeaders(req) {
+  const headers = {};
+  // Convert Headers object to plain object
+  if (req.raw && req.raw.headers) {
+    for (const [key, value] of req.raw.headers.entries()) {
+      headers[key.toLowerCase()] = value;
+    }
+  }
+  return headers;
+}
+
+/**
+ * Gets headers from Hono response
+ * @param {object} res Hono response object
+ * @returns {object} Headers object
+ */
+function getHonoResponseHeaders(res) {
+  const headers = {};
+  // Convert Headers object to plain object
+  if (res.headers) {
+    for (const [key, value] of res.headers.entries()) {
+      headers[key.toLowerCase()] = value;
+    }
+  }
+  return headers;
+}
+
+/**
  * Transforms route paths from :param syntax to OpenAPI {param} format
  * @param {string} routePath Route path with :param syntax
  * @returns {string} Route path with {param} syntax
@@ -591,6 +828,7 @@ function transformToOpenAPIFormat(routePath) {
 module.exports = {
   sendExpressPayloadToTreblle,
   sendKoaPayloadToTreblle,
+  sendHonoPayloadToTreblle,
   sendPayloadToTreblleApi,
   getPayloadSize,
   checkPayloadSize,

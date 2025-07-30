@@ -25,7 +25,7 @@ function getCachedTimestamp() {
 async function generatePayload(
   request,
   response,
-  { apiKey, projectId, fieldsToMaskMap, requestExecutionTime, error }
+  { sdkToken, apiKey, fieldsToMaskMap, requestExecutionTime, error }
 ) {
   const errors = [];
 
@@ -77,8 +77,8 @@ async function generatePayload(
   );
 
   return {
-    api_key: apiKey,
-    project_id: projectId,
+    api_key: sdkToken,
+    project_id: apiKey,
     version: version,
     sdk: "cloudflare",
     data: {

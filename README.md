@@ -83,15 +83,15 @@ const { useTreblle } = require("treblle");
 
 ## Getting started
 
-Next, create a FREE account on <https://treblle.com> to get an API key and Project ID. After you have those simply initialize Treblle in your **app.js** file like so for Express:
+Next, create a FREE account on <https://treblle.com> to get an SDK token and API key. After you have those simply initialize Treblle in your **app.js** file like so for Express:
 
 ```js
 const app = express();
 app.use(express.json());
 
 useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
 });
 ```
 
@@ -112,8 +112,8 @@ const router = new KoaRouter();
 
 app.use(
   koaTreblle({
+    sdkToken: "_YOUR_SDK_TOKEN_",
     apiKey: "_YOUR_API_KEY_",
-    projectId: "_YOUR_PROJECT_ID_",
   })
 );
 ```
@@ -138,8 +138,8 @@ module.exports = (strapi) => {
     initialize() {
       strapi.app.use(
         strapiTreblle({
+          sdkToken: "_YOUR_SDK_TOKEN_",
           apiKey: "_YOUR_API_KEY_",
-          projectId: "_YOUR_PROJECT_ID_",
         })
       );
     },
@@ -198,8 +198,8 @@ const { serviceWorkerTreblle } = require("treblle");
 
 // Call this function for initialization, Treblle will attach itself to the 'fetch' event to be able to listen for response
 const treblle = serviceWorkerTreblle({
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
   additionalFieldsToMask: ["key1", "key2"], // Optional
   showErrors: false, // Optional, defaults to false
 });
@@ -232,8 +232,8 @@ import { moduleWorkerTreblle } from "treblle";
 
 // Initialize Treblle with this function, and store Treblle wrapper inside a variable
 const treblle = moduleWorkerTreblle({
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
   additionalFieldsToMask: ["key1", "key2"], // Optional
   showErrors: false, // Optional, defaults to false
 });
@@ -277,8 +277,8 @@ const app = await NestFactory.create(AppModule);
 const expressInstance = app.getHttpAdapter().getInstance();
 
 useNestTreblle(expressInstance, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
 });
 
 ...
@@ -294,8 +294,8 @@ app.use(express.json());
 
 if (process.env.NODE_ENV === "production") {
   useTreblle(app, {
+    sdkToken: "_YOUR_SDK_TOKEN_",
     apiKey: "_YOUR_API_KEY_",
-    projectId: "_YOUR_PROJECT_ID_",
   });
 }
 ```
@@ -306,8 +306,8 @@ If you want to expand the list of fields you want to hide, you can pass property
 
 ```js
 useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
   additionalFieldsToMask: ["secretField", "highlySensitiveField"],
 });
 ```
@@ -318,8 +318,8 @@ For easier debugging when sending the data to Treblle errors are visible by defa
 
 ```js
 useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  projectId: "_YOUR_PROJECT_ID_",
   showErrors: false,
 });
 ```

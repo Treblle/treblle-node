@@ -3,6 +3,7 @@ const {
   koaTreblle,
   strapiTreblle,
   useNestTreblle,
+  honoTreblle,
 } = require("./src/treblle");
 
 const {
@@ -20,4 +21,5 @@ module.exports = {
   moduleWorkerTreblle,
   serviceWorkerTreblle,
   useNestTreblle,
+  honoTreblle,
 };

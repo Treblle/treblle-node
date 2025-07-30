@@ -2,8 +2,8 @@ const { sendPayload } = require("./send-payload");
 const { generateFieldsToMaskMap } = require("../maskFields");
 
 const serviceWorkerTreblle = function ({
+  sdkToken,
   apiKey,
-  projectId,
   additionalFieldsToMask = [],
   showErrors = false,
 }) {
@@ -29,8 +29,8 @@ const serviceWorkerTreblle = function ({
               response = await responsePromise;
               try {
                 await sendPayload(requestClone, response.clone(), {
+                  sdkToken,
                   apiKey,
-                  projectId,
                   fieldsToMaskMap,
                   showErrors,
                   requestExecutionTime: requestEndTime - requestStartTime,
@@ -46,8 +46,8 @@ const serviceWorkerTreblle = function ({
             } catch (err) {
               try {
                 await sendPayload(requestClone, null, {
+                  sdkToken,
                   apiKey,
-                  projectId,
                   fieldsToMaskMap,
                   showErrors,
                   requestExecutionTime: requestEndTime - requestStartTime,
@@ -73,8 +73,8 @@ const serviceWorkerTreblle = function ({
         const requestEndTime = Date.now();
         error = err;
         sendPayload(requestClone, null, {
+          sdkToken,
           apiKey,
-          projectId,
           fieldsToMaskMap,
           showErrors,
           requestExecutionTime: requestEndTime - requestStartTime,

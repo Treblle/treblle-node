@@ -5,8 +5,8 @@ async function sendPayload(
   request,
   response,
   {
+    sdkToken,
     apiKey,
-    projectId,
     fieldsToMaskMap,
     showErrors = false,
     requestExecutionTime,
@@ -14,14 +14,14 @@ async function sendPayload(
   }
 ) {
   const trebllePayload = await generatePayload(request, response, {
+    sdkToken,
     apiKey,
-    projectId,
     fieldsToMaskMap,
     requestExecutionTime,
     error,
   });
 
-  sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
 }
 
 module.exports = {
