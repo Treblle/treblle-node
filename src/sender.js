@@ -3,6 +3,129 @@ const os = require("os");
 const fetch = require("node-fetch");
 const stackTrace = require("stack-trace");
 const VERSION = require("../package.json").version;
+const http = require("http");
+const https = require("https");
+
+// Cache expensive operations at module load
+const CACHED_OS_INFO = {
+  name: os.platform(),
+  release: os.release(),
+  architecture: os.arch(),
+};
+const CACHED_NODE_VERSION = process.version;
+const CACHED_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// HTTP Agent with connection pooling and keep-alive
+const HTTP_AGENT = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000, // 30 seconds
+  maxSockets: 10,
+  maxFreeSockets: 5,
+  timeout: 5000, // 5 second socket timeout
+});
+
+const HTTPS_AGENT = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 30000,
+  maxSockets: 10,
+  maxFreeSockets: 5,
+  timeout: 5000,
+});
+
+// Treblle API endpoints for load balancing
+const TREBLLE_ENDPOINTS = [
+  "https://rocknrolla.treblle.com",
+  "https://sicario.treblle.com",
+  "https://punisher.treblle.com",
+];
+
+function getRandomEndpoint() {
+  const randomIndex = Math.floor(Math.random() * TREBLLE_ENDPOINTS.length);
+  return TREBLLE_ENDPOINTS[randomIndex];
+}
+
+// Cache for timestamps to reduce Date object creation
+let lastTimestamp = null;
+let lastTimestampTime = 0;
+const TIMESTAMP_CACHE_MS = 1000; // Cache for 1 second
+
+function getCachedTimestamp() {
+  const now = Date.now();
+  if (!lastTimestamp || now - lastTimestampTime > TIMESTAMP_CACHE_MS) {
+    lastTimestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
+    lastTimestampTime = now;
+  }
+  return lastTimestamp;
+}
+
+// Payload size limits and helpers
+const MAX_PAYLOAD_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+const PAYLOAD_TOO_LARGE_MESSAGE = {
+  message: "Treblle only captures requests and responses up to 5MB",
+  actual_size_bytes: null,
+};
+
+function estimateObjectSize(obj, visited = new WeakSet()) {
+  if (!obj || typeof obj !== "object" || visited.has(obj)) return 0;
+  visited.add(obj);
+
+  let size = 0;
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      if (typeof item === "string") {
+        size += Buffer.byteLength(item, "utf8");
+      } else if (typeof item === "object") {
+        size += estimateObjectSize(item, visited);
+      } else {
+        size += 8; // rough estimate for primitives
+      }
+
+      // Early exit if we exceed limit
+      if (size > MAX_PAYLOAD_SIZE) return size;
+    }
+  } else {
+    for (const [key, value] of Object.entries(obj)) {
+      size += Buffer.byteLength(key, "utf8"); // key size
+
+      if (typeof value === "string") {
+        size += Buffer.byteLength(value, "utf8");
+      } else if (typeof value === "object") {
+        size += estimateObjectSize(value, visited);
+      } else {
+        size += 8; // rough estimate for primitives
+      }
+
+      // Early exit if we exceed limit
+      if (size > MAX_PAYLOAD_SIZE) return size;
+    }
+  }
+
+  return size;
+}
+
+function getPayloadSize(payload) {
+  if (!payload) return 0;
+  if (typeof payload === "string") {
+    return Buffer.byteLength(payload, "utf8");
+  }
+  if (Buffer.isBuffer(payload)) {
+    return payload.length;
+  }
+  // Fast recursive estimation without full serialization
+  return estimateObjectSize(payload);
+}
+
+function checkPayloadSize(payload) {
+  const size = getPayloadSize(payload);
+  if (size > MAX_PAYLOAD_SIZE) {
+    return {
+      ...PAYLOAD_TOO_LARGE_MESSAGE,
+      actual_size_bytes: size,
+    };
+  }
+  return payload;
+}
 
 /**
  * Prepares the payload which is sent to Treblle.
@@ -22,8 +145,9 @@ const generateTrebllePayload = function (
 ) {
   const payload = req.method === "GET" ? req.query : req.body;
   const parsedPayload = getPayload(payload);
+  const sizeCheckedPayload = checkPayloadSize(parsedPayload);
   const maskedRequestPayload = maskSensitiveValues(
-    parsedPayload,
+    sizeCheckedPayload,
     fieldsToMaskMap
   );
 
@@ -33,6 +157,7 @@ const generateTrebllePayload = function (
 
   // We should be able to parse this, but you never know if users will try doing something weird...
   let maskedResponseBody;
+  let parsedResponseBody;
   try {
     let originalResponseBody = res.__treblle_body_response;
     // if the response is streamed it could be a buffer
@@ -42,14 +167,16 @@ const generateTrebllePayload = function (
     }
 
     if (typeof originalResponseBody === "string") {
-      let parsedResponseBody = JSON.parse(originalResponseBody);
+      parsedResponseBody = JSON.parse(originalResponseBody);
+      const sizeCheckedResponseBody = checkPayloadSize(parsedResponseBody);
       maskedResponseBody = maskSensitiveValues(
-        parsedResponseBody,
+        sizeCheckedResponseBody,
         fieldsToMaskMap
       );
     } else if (typeof originalResponseBody === "object") {
+      const sizeCheckedResponseBody = checkPayloadSize(originalResponseBody);
       maskedResponseBody = maskSensitiveValues(
-        originalResponseBody,
+        sizeCheckedResponseBody,
         fieldsToMaskMap
       );
     }
@@ -67,7 +194,7 @@ const generateTrebllePayload = function (
   const protocol = `${req.protocol.toUpperCase()}/${req.httpVersion}`;
 
   // get rid of the workaround body, we don't need it anymore
-  res.__treblle_body_response = null;
+  delete res.__treblle_body_response;
 
   if (error) {
     const trace = stackTrace.parse(error);
@@ -88,22 +215,18 @@ const generateTrebllePayload = function (
     sdk: "node",
     data: {
       server: {
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        os: {
-          name: os.platform(),
-          release: os.release(),
-          architecture: os.arch(),
-        },
+        timezone: CACHED_TIMEZONE,
+        os: CACHED_OS_INFO,
         software: null,
         signature: null,
         protocol: protocol,
       },
       language: {
         name: "node",
-        version: process.version,
+        version: CACHED_NODE_VERSION,
       },
       request: {
-        timestamp: new Date().toISOString().replace("T", " ").substr(0, 19),
+        timestamp: getCachedTimestamp(),
         ip: req.ip,
         url: getRequestUrl(req),
         user_agent: req.get("user-agent"),
@@ -145,8 +268,9 @@ const generateKoaTrebllePayload = function (
       ? koaContext.request.query
       : koaContext.request.body;
   const parsedPayload = getPayload(payload);
+  const sizeCheckedPayload = checkPayloadSize(parsedPayload);
   const maskedRequestPayload = maskSensitiveValues(
-    parsedPayload,
+    sizeCheckedPayload,
     fieldsToMaskMap
   );
 
@@ -157,6 +281,7 @@ const generateKoaTrebllePayload = function (
   // We should be able to parse this, but you never know if users will try doing something weird...
   // TODO - figure out Koa buffers & streaming
   let maskedResponseBody;
+  let parsedResponseBody;
   try {
     let originalResponseBody = koaContext.response.body;
     // if the response is streamed it could be a buffer
@@ -166,14 +291,16 @@ const generateKoaTrebllePayload = function (
     }
 
     if (typeof originalResponseBody === "string") {
-      let parsedResponseBody = JSON.parse(originalResponseBody);
+      parsedResponseBody = JSON.parse(originalResponseBody);
+      const sizeCheckedResponseBody = checkPayloadSize(parsedResponseBody);
       maskedResponseBody = maskSensitiveValues(
-        parsedResponseBody,
+        sizeCheckedResponseBody,
         fieldsToMaskMap
       );
     } else if (typeof originalResponseBody === "object") {
+      const sizeCheckedResponseBody = checkPayloadSize(originalResponseBody);
       maskedResponseBody = maskSensitiveValues(
-        originalResponseBody,
+        sizeCheckedResponseBody,
         fieldsToMaskMap
       );
     }
@@ -211,22 +338,18 @@ const generateKoaTrebllePayload = function (
     sdk: "node",
     data: {
       server: {
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        os: {
-          name: os.platform(),
-          release: os.release(),
-          architecture: os.arch(),
-        },
+        timezone: CACHED_TIMEZONE,
+        os: CACHED_OS_INFO,
         software: null,
         signature: null,
         protocol: protocol,
       },
       language: {
         name: "node",
-        version: process.version,
+        version: CACHED_NODE_VERSION,
       },
       request: {
-        timestamp: new Date().toISOString().replace("T", " ").substr(0, 19),
+        timestamp: getCachedTimestamp(),
         ip: koaContext.request.ip,
         url: getRequestUrl(koaContext.request),
         user_agent: koaContext.request.header["user-agent"],
@@ -296,20 +419,34 @@ function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
     return;
   }
 
-  f("https://rocknrolla.treblle.com", {
+  // Add timeout and agent configuration
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+  const endpoint = getRandomEndpoint();
+
+  f(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
+      "Accept-Encoding": "gzip, deflate",
+      Connection: "keep-alive",
+      "User-Agent": `treblle-node/${VERSION}`,
     },
     body: JSON.stringify(trebllePayload),
+    agent: (url) => (url.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT),
+    timeout: 5000,
+    signal: controller.signal,
   }).then(
     (response) => {
+      clearTimeout(timeoutId);
       if (showErrors && response.ok === false) {
         logTreblleResponseError(response);
       }
     },
     (error) => {
+      clearTimeout(timeoutId);
       if (showErrors) {
         logRequestFailed(error);
       }
@@ -391,7 +528,7 @@ function getPayload(payload) {
  */
 function getRoutePath(req) {
   let routePath = null;
-  
+
   // Express/NestJS route pattern
   if (req.route && req.route.path) {
     routePath = req.route.path;
@@ -400,12 +537,12 @@ function getRoutePath(req) {
   else if (req.baseUrl && req.route && req.route.path) {
     routePath = req.baseUrl + req.route.path;
   }
-  
+
   // Transform Express :param syntax to OpenAPI {param} format
   if (routePath) {
     return transformToOpenAPIFormat(routePath);
   }
-  
+
   return null;
 }
 
@@ -416,7 +553,7 @@ function getRoutePath(req) {
  */
 function getKoaRoutePath(ctx) {
   let routePath = null;
-  
+
   // Koa Router path pattern
   if (ctx._matchedRoute) {
     routePath = ctx._matchedRoute;
@@ -432,12 +569,12 @@ function getKoaRoutePath(ctx) {
   else if (ctx.routerPath) {
     routePath = ctx.routerPath;
   }
-  
+
   // Transform Koa :param syntax to OpenAPI {param} format
   if (routePath) {
     return transformToOpenAPIFormat(routePath);
   }
-  
+
   return null;
 }
 
@@ -448,11 +585,14 @@ function getKoaRoutePath(ctx) {
  */
 function transformToOpenAPIFormat(routePath) {
   // Transform :param to {param} and :param? to {param} (optional params)
-  return routePath.replace(/:([a-zA-Z_$][a-zA-Z0-9_$]*)\??/g, '{$1}');
+  return routePath.replace(/:([a-zA-Z_$][a-zA-Z0-9_$]*)\??/g, "{$1}");
 }
 
 module.exports = {
   sendExpressPayloadToTreblle,
   sendKoaPayloadToTreblle,
   sendPayloadToTreblleApi,
+  getPayloadSize,
+  checkPayloadSize,
+  getRandomEndpoint,
 };

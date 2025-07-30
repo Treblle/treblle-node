@@ -41,7 +41,6 @@ Treblle is a lightweight SDK that helps Engineering and Product teams build, shi
 - [API Lifecycle Collaboration](https://www.treblle.com/features/api-lifecycle)
 - [Native Treblle Apps](https://www.treblle.com/features/native-apps)
 
-
 ## Treblle for Node
 
 [![Latest Version](https://img.shields.io/npm/v/treblle)](https://img.shields.io/npm/v/treblle)
@@ -201,7 +200,7 @@ const { serviceWorkerTreblle } = require("treblle");
 const treblle = serviceWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   projectId: "_YOUR_PROJECT_ID_",
-  additionalFieldsToMask: ['key1', 'key2'], // Optional
+  additionalFieldsToMask: ["key1", "key2"], // Optional
   showErrors: false, // Optional, defaults to false
 });
 
@@ -235,7 +234,7 @@ import { moduleWorkerTreblle } from "treblle";
 const treblle = moduleWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   projectId: "_YOUR_PROJECT_ID_",
-  additionalFieldsToMask: ['key1', 'key2'], // Optional
+  additionalFieldsToMask: ["key1", "key2"], // Optional
   showErrors: false, // Optional, defaults to false
 });
 
@@ -268,7 +267,6 @@ Treblle package (currently) uses some Node native libraries for other integratio
 
 ### NestJS (with Express)
 
-
 ```js
 // NestJS's boostrap function
 
@@ -285,7 +283,6 @@ useNestTreblle(expressInstance, {
 
 ...
 ```
-
 
 ### Running Treblle only in production
 

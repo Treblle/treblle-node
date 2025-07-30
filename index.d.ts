@@ -4,7 +4,7 @@ declare module "treblle" {
     projectId: string;
     additionalFieldsToMask?: string[];
     showErrors?: boolean;
-    blocklistPaths?: string[]|RegExp;
+    blocklistPaths?: string[] | RegExp;
   };
 
   type StrapiOptionsBase = {
@@ -12,7 +12,7 @@ declare module "treblle" {
     projectId: string;
     additionalFieldsToMask?: string[];
     showErrors?: boolean;
-    blocklistPaths?: string[]|RegExp;
+    blocklistPaths?: string[] | RegExp;
     ignoreAdminRoutes?: string[];
   };
 
@@ -27,13 +27,9 @@ declare module "treblle" {
 
   export function useTreblle(app: any, options: any): void;
 
-  export function koaTreblle(
-   options: OptionsBase
-  ): Function;
+  export function koaTreblle(options: OptionsBase): Function;
 
-  export function strapiTreblle(
-    options: StrapiOptionsBase
-  ): Function;
+  export function strapiTreblle(options: StrapiOptionsBase): Function;
 
   export function serviceWorkerTreblle(
     options: OptionsBase

@@ -13,6 +13,20 @@ const fieldsToMask = [
   "creditScore",
 ];
 
+// Pre-generate common mask strings for performance
+const MASK_CACHE = new Map();
+const MAX_MASK_LENGTH = 256;
+for (let i = 1; i <= MAX_MASK_LENGTH; i++) {
+  MASK_CACHE.set(i, "*".repeat(i));
+}
+
+function getMaskString(length) {
+  if (length <= MAX_MASK_LENGTH) {
+    return MASK_CACHE.get(length);
+  }
+  return "*".repeat(length);
+}
+
 /**
  * Generates an object of fields to mask.
  *
@@ -46,12 +60,13 @@ function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
     );
   }
 
-  let objectToMask = { ...payloadObject };
+  // Optimize: avoid object spread for better performance
+  let objectToMask = payloadObject;
 
   let safeObject = Object.keys(objectToMask).reduce(function (acc, propName) {
     if (typeof objectToMask[propName] === "string") {
       if (fieldsToMaskMap[propName] === true) {
-        acc[propName] = "*".repeat(objectToMask[propName].length);
+        acc[propName] = getMaskString(objectToMask[propName].length);
       } else {
         acc[propName] = objectToMask[propName];
       }
@@ -59,7 +74,10 @@ function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
       acc[propName] = objectToMask[propName].map((val) =>
         maskSensitiveValues(val, fieldsToMaskMap)
       );
-    } else if (typeof objectToMask[propName] === "object") {
+    } else if (
+      typeof objectToMask[propName] === "object" &&
+      objectToMask[propName] !== null
+    ) {
       acc[propName] = maskSensitiveValues(
         objectToMask[propName],
         fieldsToMaskMap

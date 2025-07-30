@@ -2,7 +2,25 @@ const stackTrace = require("stack-trace");
 
 const version = require("../../package.json").version;
 const { maskSensitiveValues } = require("../maskFields");
+const { checkPayloadSize } = require("../sender");
 const { ContentType } = require("../consts");
+
+// Cache expensive operations at module load (same as sender.js)
+const CACHED_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Cache for timestamps to reduce Date object creation
+let lastTimestamp = null;
+let lastTimestampTime = 0;
+const TIMESTAMP_CACHE_MS = 1000; // Cache for 1 second
+
+function getCachedTimestamp() {
+  const now = Date.now();
+  if (!lastTimestamp || now - lastTimestampTime > TIMESTAMP_CACHE_MS) {
+    lastTimestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
+    lastTimestampTime = now;
+  }
+  return lastTimestamp;
+}
 
 async function generatePayload(
   request,
@@ -12,15 +30,21 @@ async function generatePayload(
   const errors = [];
 
   const requestBody = await parseRequest(request);
-  const maskedRequestBody = requestBody
-    ? maskSensitiveValues(requestBody, fieldsToMaskMap)
+  const sizeCheckedRequestBody = requestBody
+    ? checkPayloadSize(requestBody)
+    : null;
+  const maskedRequestBody = sizeCheckedRequestBody
+    ? maskSensitiveValues(sizeCheckedRequestBody, fieldsToMaskMap)
     : null;
 
   let maskedResponseBody = null;
   try {
     const responseBody = response ? await parseResponse(response) : null;
-    maskedResponseBody = responseBody
-      ? maskSensitiveValues(responseBody, fieldsToMaskMap)
+    const sizeCheckedResponseBody = responseBody
+      ? checkPayloadSize(responseBody)
+      : null;
+    maskedResponseBody = sizeCheckedResponseBody
+      ? maskSensitiveValues(sizeCheckedResponseBody, fieldsToMaskMap)
       : null;
   } catch (err) {
     errors.push({
@@ -59,7 +83,7 @@ async function generatePayload(
     sdk: "cloudflare",
     data: {
       server: {
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone: CACHED_TIMEZONE,
         os: {
           name: "Cloudflare Workers Runtime",
         },
@@ -71,7 +95,7 @@ async function generatePayload(
         name: "js",
       },
       request: {
-        timestamp: new Date().toISOString().replace("T", " ").substr(0, 19),
+        timestamp: getCachedTimestamp(),
         ip: request.headers.get("x-real-ip"),
         url: request.url,
         user_agent: request.headers.get("user-agent"),
@@ -165,7 +189,7 @@ const getSize = (item) => {
 
 /**
  * Extracts route path from Cloudflare Workers request
- * Since Cloudflare Workers don't have built-in routing, 
+ * Since Cloudflare Workers don't have built-in routing,
  * this checks for a custom route_path property set by the developer
  * @param {Request} request Cloudflare Workers request object
  * @returns {string|null} Route pattern or null if not available
@@ -175,13 +199,13 @@ const getCloudflareRoutePath = (request) => {
   if (request.route_path) {
     return request.route_path;
   }
-  
+
   // Check if it's in the request headers (custom implementation)
   const routeHeader = request.headers.get("x-route-path");
   if (routeHeader) {
     return routeHeader;
   }
-  
+
   return null;
 };
 
