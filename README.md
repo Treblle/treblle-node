@@ -774,7 +774,7 @@ If you continue to experience issues:
 2. Verify your SDK token and API key are correct in Treblle dashboard
 3. Test with a simple endpoint first
 4. Check [Treblle documentation](https://docs.treblle.com) for the latest updates
-5. Contact support at <https://treblle.com> or email vedran@treblle.com
+5. Contact support at <https://treblle.com> or email support@treblle.com
 
 ## Support
 
