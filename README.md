@@ -33,12 +33,12 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 - [Strapi](https://strapi.io/)
 - [Cloudflare Workers](https://workers.cloudflare.com/)
 
-## Installation
+## Installation (⚠️ Beta Release)
 
 You can install the Treblle JavaScript SDK via [NPM](https://www.npmjs.com/). Simply run the following command:
 
 ```bash
-$ npm install treblle
+$ npm install treblle@2.0.0-beta.1
 ```
 
 Don't forget to load the required JS modules in your app.js like so:
