@@ -15,7 +15,7 @@ const {
  * @param {string} settings.apiKey Treblle API key
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
- * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} settings.debug controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
 const useTreblle = function (
@@ -25,18 +25,18 @@ const useTreblle = function (
     apiKey,
     additionalFieldsToMask = [],
     blocklistPaths = [],
-    showErrors = false,
+    debug = false,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, showErrors });
+  patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, debug });
   app.use(
     TreblleMiddleware({
       sdkToken,
       apiKey,
       fieldsToMaskMap,
       blocklistPaths,
-      showErrors,
+      debug,
     })
   );
 
@@ -52,7 +52,7 @@ const useTreblle = function (
  * @param {string} settings.apiKey Treblle API key
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
- * @param {boolean?} settings.showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} settings.debug controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
 const useNestTreblle = function (
@@ -62,7 +62,7 @@ const useNestTreblle = function (
     apiKey,
     additionalFieldsToMask = [],
     blocklistPaths = [],
-    showErrors = false,
+    debug = false,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
@@ -70,7 +70,7 @@ const useNestTreblle = function (
     sdkToken,
     apiKey,
     fieldsToMaskMap,
-    showErrors,
+    debug,
     blocklistPaths,
   });
   app.use(
@@ -78,7 +78,7 @@ const useNestTreblle = function (
       sdkToken,
       apiKey,
       fieldsToMaskMap,
-      showErrors,
+      debug,
       blocklistPaths,
       isNestjs: true,
     })
@@ -98,7 +98,7 @@ const useNestTreblle = function (
  * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
  * @returns {undefined}
  */
-function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, showErrors }) {
+function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, debug }) {
   // we need to overwrite the default send to be able to access the response body
   const originalSend = app.response.send;
   app.response.send = function sendOverWrite(body) {
@@ -121,7 +121,7 @@ function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, showErrors }) {
         fieldsToMaskMap,
         // in case of error the request time will be faulty
         requestStartTime: process.hrtime(),
-        showErrors,
+        debug,
       });
 
       logerror.call(self, error);
@@ -151,7 +151,7 @@ function TreblleMiddleware({
   apiKey,
   fieldsToMaskMap,
   blocklistPaths,
-  showErrors,
+  debug,
   isNestjs,
 }) {
   return function _TreblleMiddlewareHandler(req, res, next) {
@@ -181,7 +181,7 @@ function TreblleMiddleware({
             apiKey,
             requestStartTime,
             fieldsToMaskMap,
-            showErrors,
+            debug,
           });
         }
       });
@@ -200,7 +200,7 @@ function TreblleMiddleware({
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
- * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} debug controls error logging when sending data to Treblle
  * @returns {function} koa middleware function
  */
 function koaTreblle({
@@ -208,7 +208,7 @@ function koaTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
-  showErrors = false,
+  debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
@@ -229,7 +229,7 @@ function koaTreblle({
       sdkToken,
       apiKey,
       fieldsToMaskMap,
-      showErrors,
+      debug,
     });
   };
 }
@@ -241,7 +241,7 @@ function koaTreblle({
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
- * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} debug controls error logging when sending data to Treblle
  * @param {string[]} ignoreAdminRoutes controls logging /admin routes
  * @returns {function} koa middleware function
  */
@@ -250,7 +250,7 @@ function strapiTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
-  showErrors = false,
+  debug = false,
   ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
@@ -278,7 +278,7 @@ function strapiTreblle({
       sdkToken,
       apiKey,
       fieldsToMaskMap,
-      showErrors,
+      debug,
     });
   };
 }
@@ -289,7 +289,7 @@ async function koaMiddlewareFn({
   sdkToken,
   apiKey,
   fieldsToMaskMap,
-  showErrors,
+  debug,
 }) {
   const requestStartTime = process.hrtime();
 
@@ -300,7 +300,7 @@ async function koaMiddlewareFn({
       apiKey,
       requestStartTime,
       fieldsToMaskMap,
-      showErrors,
+      debug,
     });
   } catch (error) {
     sendKoaPayloadToTreblle(ctx, {
@@ -308,7 +308,7 @@ async function koaMiddlewareFn({
       apiKey,
       requestStartTime,
       fieldsToMaskMap,
-      showErrors,
+      debug,
       error,
     });
     throw error;
@@ -327,7 +327,7 @@ function logerror(err) {
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
- * @param {boolean?} showErrors controls error logging when sending data to Treblle
+ * @param {boolean?} debug controls error logging when sending data to Treblle
  * @returns {function} hono middleware function
  */
 function honoTreblle({
@@ -335,7 +335,7 @@ function honoTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
-  showErrors = false,
+  debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
@@ -356,7 +356,7 @@ function honoTreblle({
       sdkToken,
       apiKey,
       fieldsToMaskMap,
-      showErrors,
+      debug,
     });
   };
 }
@@ -367,22 +367,22 @@ async function honoMiddlewareFn({
   sdkToken,
   apiKey,
   fieldsToMaskMap,
-  showErrors,
+  debug,
 }) {
   const requestStartTime = process.hrtime();
 
   try {
     await next();
-    
+
     // Capture response body for Hono
     await captureHonoResponseBody(c);
-    
+
     sendHonoPayloadToTreblle(c, {
       sdkToken,
       apiKey,
       requestStartTime,
       fieldsToMaskMap,
-      showErrors,
+      debug,
     });
   } catch (error) {
     sendHonoPayloadToTreblle(c, {
@@ -390,7 +390,7 @@ async function honoMiddlewareFn({
       apiKey,
       requestStartTime,
       fieldsToMaskMap,
-      showErrors,
+      debug,
       error,
     });
     throw error;
@@ -402,7 +402,7 @@ async function captureHonoResponseBody(c) {
     if (c.res && c.res.body) {
       // Clone the response to read the body without consuming it
       const clonedResponse = c.res.clone();
-      
+
       // Try to read as text first
       let responseBody;
       try {
@@ -417,7 +417,7 @@ async function captureHonoResponseBody(c) {
           responseBody = null;
         }
       }
-      
+
       // Store captured body for later access
       c.__treblle_body_response = responseBody;
     }

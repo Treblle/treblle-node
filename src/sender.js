@@ -367,7 +367,10 @@ const generateHonoTrebllePayload = function (
         route_path: getHonoRoutePath(honoContext),
       },
       response: {
-        headers: maskSensitiveValues(getHonoResponseHeaders(honoContext.res), fieldsToMaskMap),
+        headers: maskSensitiveValues(
+          getHonoResponseHeaders(honoContext.res),
+          fieldsToMaskMap
+        ),
         code: honoContext.res.status,
         size: null, // Hono doesn't expose content length easily
         load_time: getRequestDuration(requestStartTime),
@@ -509,7 +512,7 @@ const generateKoaTrebllePayload = function (
 function sendExpressPayloadToTreblle(
   req,
   res,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, showErrors }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, debug }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
     sdkToken,
@@ -519,12 +522,12 @@ function sendExpressPayloadToTreblle(
     fieldsToMaskMap,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
 }
 
 function sendKoaPayloadToTreblle(
   koaContext,
-  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, showErrors, error }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error }
 ) {
   let trebllePayload = generateKoaTrebllePayload(koaContext, {
     sdkToken,
@@ -534,12 +537,12 @@ function sendKoaPayloadToTreblle(
     fieldsToMaskMap,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
 }
 
 function sendHonoPayloadToTreblle(
   honoContext,
-  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, showErrors, error }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error }
 ) {
   let trebllePayload = generateHonoTrebllePayload(honoContext, {
     sdkToken,
@@ -549,17 +552,17 @@ function sendHonoPayloadToTreblle(
     fieldsToMaskMap,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, showErrors });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
 }
 
-function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
+function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug }) {
   let f;
   if (typeof fetch === "function") {
     f = fetch;
   } else if (fetch && typeof fetch.default === "function") {
     f = fetch.default;
   } else {
-    if (showErrors) {
+    if (debug) {
       console.warn("Treblle error: fetch is not defined");
     }
     return;
@@ -587,13 +590,13 @@ function sendPayloadToTreblleApi({ apiKey, trebllePayload, showErrors }) {
   }).then(
     (response) => {
       clearTimeout(timeoutId);
-      if (showErrors && response.ok === false) {
+      if (debug && response.ok === false) {
         logTreblleResponseError(response);
       }
     },
     (error) => {
       clearTimeout(timeoutId);
-      if (showErrors) {
+      if (debug) {
         logRequestFailed(error);
       }
     }
@@ -738,11 +741,11 @@ function getHonoRoutePath(c) {
       routePattern = c.req.routePath;
     }
     // Fallback: Check if context has routePath method
-    else if (c.routePath && typeof c.routePath === 'function') {
+    else if (c.routePath && typeof c.routePath === "function") {
       routePattern = c.routePath();
     }
     // Fallback: Check if context has routePath as property
-    else if (c.routePath && typeof c.routePath === 'string') {
+    else if (c.routePath && typeof c.routePath === "string") {
       routePattern = c.routePath;
     }
   } catch (error) {

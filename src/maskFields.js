@@ -15,7 +15,7 @@ const fieldsToMask = [
 
 // Pre-generate common mask strings for performance
 const MASK_CACHE = new Map();
-const MAX_MASK_LENGTH = 256;
+const MAX_MASK_LENGTH = 32;
 for (let i = 1; i <= MAX_MASK_LENGTH; i++) {
   MASK_CACHE.set(i, "*".repeat(i));
 }
@@ -37,11 +37,13 @@ function getMaskString(length) {
  * @returns {object}
  */
 function generateFieldsToMaskMap(additionalFieldsToMask = []) {
-  const fields = [...fieldsToMask, ...additionalFieldsToMask];
-  const fieldsMap = fields.reduce((acc, field) => {
-    acc[field] = true;
-    return acc;
-  }, {});
+  const fieldsMap = {};
+  for (const field of fieldsToMask) {
+    fieldsMap[field] = true;
+  }
+  for (const field of additionalFieldsToMask) {
+    fieldsMap[field] = true;
+  }
   return fieldsMap;
 }
 
@@ -63,31 +65,30 @@ function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
   // Optimize: avoid object spread for better performance
   let objectToMask = payloadObject;
 
-  let safeObject = Object.keys(objectToMask).reduce(function (acc, propName) {
+  let safeObject = {};
+  for (const propName in objectToMask) {
     if (typeof objectToMask[propName] === "string") {
       if (fieldsToMaskMap[propName] === true) {
-        acc[propName] = getMaskString(objectToMask[propName].length);
+        safeObject[propName] = getMaskString(objectToMask[propName].length);
       } else {
-        acc[propName] = objectToMask[propName];
+        safeObject[propName] = objectToMask[propName];
       }
     } else if (Array.isArray(objectToMask[propName])) {
-      acc[propName] = objectToMask[propName].map((val) =>
+      safeObject[propName] = objectToMask[propName].map((val) =>
         maskSensitiveValues(val, fieldsToMaskMap)
       );
     } else if (
       typeof objectToMask[propName] === "object" &&
       objectToMask[propName] !== null
     ) {
-      acc[propName] = maskSensitiveValues(
+      safeObject[propName] = maskSensitiveValues(
         objectToMask[propName],
         fieldsToMaskMap
       );
     } else {
-      acc[propName] = objectToMask[propName];
+      safeObject[propName] = objectToMask[propName];
     }
-
-    return acc;
-  }, {});
+  }
 
   return safeObject;
 }

@@ -5,7 +5,7 @@ const serviceWorkerTreblle = function ({
   sdkToken,
   apiKey,
   additionalFieldsToMask = [],
-  showErrors = false,
+  debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
@@ -32,7 +32,7 @@ const serviceWorkerTreblle = function ({
                   sdkToken,
                   apiKey,
                   fieldsToMaskMap,
-                  showErrors,
+                  debug,
                   requestExecutionTime: requestEndTime - requestStartTime,
                   error: null,
                 });
@@ -49,7 +49,7 @@ const serviceWorkerTreblle = function ({
                   sdkToken,
                   apiKey,
                   fieldsToMaskMap,
-                  showErrors,
+                  debug,
                   requestExecutionTime: requestEndTime - requestStartTime,
                   error: err,
                 });
@@ -76,7 +76,7 @@ const serviceWorkerTreblle = function ({
           sdkToken,
           apiKey,
           fieldsToMaskMap,
-          showErrors,
+          debug,
           requestExecutionTime: requestEndTime - requestStartTime,
           error,
         }).catch((err) => {

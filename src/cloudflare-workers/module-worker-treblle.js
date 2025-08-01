@@ -5,7 +5,7 @@ const moduleWorkerTreblle = function ({
   sdkToken,
   apiKey,
   additionalFieldsToMask = [],
-  showErrors = false,
+  debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
@@ -30,7 +30,7 @@ const moduleWorkerTreblle = function ({
           sdkToken,
           apiKey,
           fieldsToMaskMap,
-          showErrors,
+          debug,
           requestExecutionTime: requestEndTime - requestStartTime,
           error,
         });

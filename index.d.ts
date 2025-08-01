@@ -3,7 +3,7 @@ declare module "treblle" {
     sdkToken: string;
     apiKey: string;
     additionalFieldsToMask?: string[];
-    showErrors?: boolean;
+    debug?: boolean;
     blocklistPaths?: string[] | RegExp;
   };
 
@@ -11,7 +11,7 @@ declare module "treblle" {
     sdkToken: string;
     apiKey: string;
     additionalFieldsToMask?: string[];
-    showErrors?: boolean;
+    debug?: boolean;
     blocklistPaths?: string[] | RegExp;
     ignoreAdminRoutes?: string[];
   };

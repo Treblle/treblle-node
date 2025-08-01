@@ -103,17 +103,18 @@ useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-  blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths  
-  showErrors: true, // Optional: Show Treblle errors in console (default: false)
+  blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
+  debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
 
@@ -159,17 +160,18 @@ app.use(
     apiKey: "_YOUR_API_KEY_",
     additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-    showErrors: true, // Optional: Show Treblle errors in console (default: false)
+    debug: true, // Optional: Show Treblle errors in console (default: false)
   })
 );
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 ### Hono integration
 
@@ -210,7 +212,7 @@ app.use(
     apiKey: "_YOUR_API_KEY_",
     additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-    showErrors: true, // Optional: Show Treblle errors in console (default: false)
+    debug: true, // Optional: Show Treblle errors in console (default: false)
   })
 );
 ```
@@ -219,25 +221,32 @@ app.use(
 
 ```js
 // Monitor only API routes
-app.use("/api/*", honoTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-}));
+app.use(
+  "/api/*",
+  honoTreblle({
+    sdkToken: "_YOUR_SDK_TOKEN_",
+    apiKey: "_YOUR_API_KEY_",
+  })
+);
 
 // Or exclude specific paths
-app.use("*", honoTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  blocklistPaths: /^\/(health|metrics|admin)/,  // Using RegExp for complex patterns
-}));
+app.use(
+  "*",
+  honoTreblle({
+    sdkToken: "_YOUR_SDK_TOKEN_",
+    apiKey: "_YOUR_API_KEY_",
+    blocklistPaths: /^\/(health|metrics|admin)/, // Using RegExp for complex patterns
+  })
+);
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 ### Strapi integration
 
@@ -297,7 +306,7 @@ module.exports = (strapi) => {
           apiKey: "_YOUR_API_KEY_",
           additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
           blocklistPaths: ["webhooks", "uploads"], // Optional: Skip logging certain paths
-          showErrors: true, // Optional: Show Treblle errors in console (default: false)
+          debug: true, // Optional: Show Treblle errors in console (default: false)
           ignoreAdminRoutes: ["admin", "content-manager", "upload"], // Optional: Ignore admin routes (default: ["admin", "content-type-builder", "content-manager"])
         })
       );
@@ -307,11 +316,12 @@ module.exports = (strapi) => {
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 - `ignoreAdminRoutes` (optional): Array of admin route prefixes to ignore (default: `["admin", "content-type-builder", "content-manager"]`)
 
 **Note:** The `ignoreAdminRoutes` option is Strapi-specific and helps avoid logging internal admin panel requests that are typically not part of your public API.
@@ -323,6 +333,7 @@ Cloudflare Workers require bundling external packages. You need a bundler (Webpa
 #### Service workers
 
 **Setup Requirements:**
+
 - A bundler (Webpack/Rollup) to bundle dependencies
 - Polyfills for Node.js modules not available in Workers Runtime
 
@@ -348,10 +359,10 @@ module.exports = {
   },
   resolve: {
     fallback: {
-      os: false,      // Required: Treblle uses Node.js modules not available in Workers
-      url: false      // Required: These are polyfilled as empty modules
-    }
-  }
+      os: false, // Required: Treblle uses Node.js modules not available in Workers
+      url: false, // Required: These are polyfilled as empty modules
+    },
+  },
 };
 ```
 
@@ -368,13 +379,16 @@ const treblle = serviceWorkerTreblle({
 });
 
 // Wrap your fetch handler
-addEventListener("fetch", treblle((event) => {
-  event.respondWith(
-    new Response("Hello worker!", {
-      headers: { "content-type": "text/plain" },
-    })
-  );
-}));
+addEventListener(
+  "fetch",
+  treblle((event) => {
+    event.respondWith(
+      new Response("Hello worker!", {
+        headers: { "content-type": "text/plain" },
+      })
+    );
+  })
+);
 ```
 
 **Step 3:** Service Worker with all options:
@@ -384,21 +398,23 @@ const treblle = serviceWorkerTreblle({
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
-  showErrors: true, // Optional: Show Treblle errors in console (default: false)
+  debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 **Note:** `blocklistPaths` is not available for Cloudflare Workers as path filtering should be handled in your worker logic.
 
 #### Module workers
 
 **Setup Requirements:**
+
 - Same bundler setup as Service workers
 - ES modules support for import/export syntax
 
@@ -419,13 +435,13 @@ export default {
   fetch: treblle(async (request, env, context) => {
     // Your API logic here
     const url = new URL(request.url);
-    
+
     if (url.pathname === "/api/users") {
       return new Response(JSON.stringify({ users: [] }), {
         headers: { "content-type": "application/json" },
       });
     }
-    
+
     return new Response("Not found", { status: 404 });
   }),
 };
@@ -438,17 +454,19 @@ const treblle = moduleWorkerTreblle({
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
-  showErrors: true, // Optional: Show Treblle errors in console (default: false)
+  debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 **Important Notes:**
+
 - Treblle uses Node native libraries (`os` & `url`) for other integrations that aren't supported in Cloudflare Workers Runtime
 - These are polyfilled as empty modules since they're not used in the Workers integration
 - See the webpack configuration above for required polyfills
@@ -468,16 +486,16 @@ import { useNestTreblle } from "treblle";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Get the underlying Express instance
   const expressInstance = app.getHttpAdapter().getInstance();
-  
+
   // Add Treblle middleware
   useNestTreblle(expressInstance, {
     sdkToken: "_YOUR_SDK_TOKEN_",
     apiKey: "_YOUR_API_KEY_",
   });
-  
+
   await app.listen(3000);
 }
 bootstrap();
@@ -491,7 +509,7 @@ useNestTreblle(expressInstance, {
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
   blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-  showErrors: true, // Optional: Show Treblle errors in console (default: false)
+  debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
 
@@ -505,25 +523,27 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const expressInstance = app.getHttpAdapter().getInstance();
-  
+
   useNestTreblle(expressInstance, {
     sdkToken: configService.get("TREBLLE_SDK_TOKEN"),
     apiKey: configService.get("TREBLLE_API_KEY"),
-    showErrors: configService.get("NODE_ENV") !== "production",
+    debug: configService.get("NODE_ENV") !== "production",
   });
-  
+
   await app.listen(3000);
 }
 ```
 
 **Available options:**
+
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `showErrors` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 **Important Notes:**
+
 - Must be called after `NestFactory.create()` but before `app.listen()`
 - Only works with Express adapter (default NestJS adapter)
 - For Fastify adapter, use regular Express integration with Fastify-specific setup
@@ -558,13 +578,13 @@ useTreblle(app, {
 
 ### Logging errors
 
-For easier debugging when sending the data to Treblle errors are visible by default, you can control it via the `showErrors` flag, you can disable the errors with `showErrors` set to `false`:
+For easier debugging when sending the data to Treblle errors are visible by default, you can control it via the `debug` flag, you can disable the errors with `debug` set to `false`:
 
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  showErrors: false,
+  debug: false,
 });
 ```
 
@@ -575,7 +595,7 @@ useTreblle(app, {
 Treblle automatically masks sensitive fields in request and response bodies. The following fields are masked by default:
 
 - `password`
-- `pwd` 
+- `pwd`
 - `secret`
 - `password_confirmation`
 - `passwordConfirmation`
@@ -603,13 +623,13 @@ Block specific paths or patterns from being logged:
 
 ```js
 // Block specific paths (string array)
-blocklistPaths: ["admin", "health", "metrics"]
+blocklistPaths: ["admin", "health", "metrics"];
 
-// Block using RegExp for complex patterns  
-blocklistPaths: /^\/(admin|health|metrics)/
+// Block using RegExp for complex patterns
+blocklistPaths: /^\/(admin|health|metrics)/;
 
 // Mixed array with strings and RegExp
-blocklistPaths: ["admin", /^\/api\/v1\/internal/]
+blocklistPaths: ["admin", /^\/api\/v1\/internal/];
 ```
 
 ## Troubleshooting
@@ -617,19 +637,23 @@ blocklistPaths: ["admin", /^\/api\/v1\/internal/]
 ### Common Issues
 
 #### "Treblle SDK token or API key is missing"
+
 **Cause:** Required credentials not provided or undefined.
-**Solution:** 
+**Solution:**
+
 ```js
 // Make sure both values are strings, not undefined
 useTreblle(app, {
   sdkToken: process.env.TREBLLE_SDK_TOKEN, // Check this env var exists
-  apiKey: process.env.TREBLLE_API_KEY,     // Check this env var exists
+  apiKey: process.env.TREBLLE_API_KEY, // Check this env var exists
 });
 ```
 
-#### "Request payload too large" 
+#### "Request payload too large"
+
 **Cause:** Request/response body exceeds Treblle's payload size limit.
 **Solution:** Treblle automatically truncates large payloads, but you can exclude large file upload routes:
+
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
@@ -639,35 +663,42 @@ useTreblle(app, {
 ```
 
 #### "No data appearing in Treblle dashboard"
+
 **Possible causes and solutions:**
 
 1. **Wrong environment:** Check you're looking at the correct project in Treblle dashboard
 2. **Blocked paths:** Verify your routes aren't in `blocklistPaths`
-3. **Network issues:** Enable `showErrors: true` to see connection errors
+3. **Network issues:** Enable `debug: true` to see connection errors
 4. **Middleware order:** Ensure Treblle middleware is registered before your routes
 
 ```js
 // Correct order
 app.use(express.json());
-useTreblle(app, { /* config */ }); // Register Treblle BEFORE routes
-app.get("/api/users", handler);    // Routes come after
+useTreblle(app, {
+  /* config */
+}); // Register Treblle BEFORE routes
+app.get("/api/users", handler); // Routes come after
 ```
 
 #### "Treblle causing app crashes"
+
 **Cause:** Unhandled errors in Treblle integration.
-**Solution:** 
+**Solution:**
+
 ```js
 // Enable error logging to debug
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  showErrors: true, // See what's failing
+  debug: true, // See what's failing
 });
 ```
 
 #### "High memory usage"
+
 **Cause:** Large response bodies being cached.
 **Solution:** Use `blocklistPaths` to exclude endpoints with large responses:
+
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
@@ -677,21 +708,31 @@ useTreblle(app, {
 ```
 
 #### "Missing request/response data"
+
 **Framework-specific issues:**
 
 **Express:** Make sure `express.json()` middleware is registered before Treblle:
+
 ```js
 app.use(express.json());
-useTreblle(app, { /* config */ });
+useTreblle(app, {
+  /* config */
+});
 ```
 
 **Koa:** Ensure body parsing middleware is registered:
+
 ```js
 app.use(KoaBody());
-app.use(koaTreblle({ /* config */ }));
+app.use(
+  koaTreblle({
+    /* config */
+  })
+);
 ```
 
 **Strapi:** Verify middleware is enabled in `config/middleware.js`:
+
 ```js
 module.exports = {
   settings: {
@@ -701,6 +742,7 @@ module.exports = {
 ```
 
 **Cloudflare Workers:** Check webpack polyfills are configured:
+
 ```js
 // webpack.config.js
 resolve: {
@@ -716,11 +758,11 @@ resolve: {
 Enable debug mode to troubleshoot integration issues:
 
 ```js
-// All integrations support showErrors
+// All integrations support debug
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  showErrors: true, // Enable to see Treblle-related errors
+  debug: true, // Enable to see Treblle-related errors
 });
 ```
 
@@ -728,7 +770,7 @@ useTreblle(app, {
 
 If you continue to experience issues:
 
-1. Enable `showErrors: true` and check console output
+1. Enable `debug: true` and check console output
 2. Verify your SDK token and API key are correct in Treblle dashboard
 3. Test with a simple endpoint first
 4. Check [Treblle documentation](https://docs.treblle.com) for the latest updates
