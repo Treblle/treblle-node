@@ -1,50 +1,18 @@
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/b268ae9e-7c8a-4ade-95da-b4ac6fce6eea"/>
-</div>
-<div align="center">
+# Treblle - API Intelligence Platform
 
-# Treblle
+[![Treblle API Intelligence](https://github.com/user-attachments/assets/b268ae9e-7c8a-4ade-95da-b4ac6fce6eea)](https://treblle.com)
 
-<a href="https://docs.treblle.com/en/integrations" target="_blank">Integrations</a>
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-<a href="http://treblle.com/" target="_blank">Website</a>
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-<a href="https://docs.treblle.com" target="_blank">Docs</a>
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-<a href="https://blog.treblle.com" target="_blank">Blog</a>
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-<a href="https://twitter.com/treblleapi" target="_blank">Twitter</a>
-<span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
-<a href="https://treblle.com/chat" target="_blank">Discord</a>
-<br />
+[Website](http://treblle.com/) • [Documentation](https://docs.treblle.com/) • [Pricing](https://treblle.com/pricing)
 
-  <hr />
-</div>
 
-API Intelligence Platform. 🚀
+Treblle is an API intelligence platfom that helps developers, teams and organizations understand their APIs from a single integration point.
 
-Treblle is a lightweight SDK that helps Engineering and Product teams build, ship & maintain REST-based APIs faster.
+***
 
-## Features
+## Treblle JavaScript SDK
 
-<div align="center">
-  <br />
-  <img src="https://github.com/user-attachments/assets/02afd9f5-ab47-48ff-929a-0f3fcddcca34"/>
-  <br />
-  <br />
-</div>
-
-- [API Monitoring & Observability](https://www.treblle.com/features/api-monitoring-observability)
-- [Auto-generated API Docs](https://www.treblle.com/features/auto-generated-api-docs)
-- [API analytics](https://www.treblle.com/features/api-analytics)
-- [Treblle API Score](https://www.treblle.com/features/api-quality-score)
-- [API Lifecycle Collaboration](https://www.treblle.com/features/api-lifecycle)
-- [Native Treblle Apps](https://www.treblle.com/features/native-apps)
-
-## Treblle for Node
-
-[![Latest Version](https://img.shields.io/npm/v/treblle)](https://img.shields.io/npm/v/treblle)
-[![Total Downloads](https://img.shields.io/npm/dt/treblle)](https://img.shields.io/npm/dt/treblle)
+[![Latest Version](https://img.shields.io/npm/v/treblle)](https://www.npmjs.com/package/treblle)
+[![Total Downloads](https://img.shields.io/npm/dt/treblle)](https://www.npmjs.com/package/treblle)
 [![MIT Licence](https://img.shields.io/npm/l/treblle)](LICENSE.md)
 
 ## Requirements
@@ -56,9 +24,18 @@ Treblle is a lightweight SDK that helps Engineering and Product teams build, shi
 - [`express`](https://www.npmjs.com/package/express)
 - [`node-fetch`](https://www.npmjs.com/package/node-fetch)
 
+## Supported Frameworks and Runtimes
+
+- [Express](https://expressjs.com/)
+- [NestJS](https://nestjs.com/)
+- [Koa](https://koajs.com/)
+- [Hono](https://hono.dev/)
+- [Strapi](https://strapi.io/)
+- [Cloudflare Workers](https://workers.cloudflare.com/)
+
 ## Installation
 
-You can install Treblle for Node via [NPM](https://www.npmjs.com/). Simply run the following command:
+You can install the Treblle JavaScript SDK via [NPM](https://www.npmjs.com/). Simply run the following command:
 
 ```bash
 $ npm install treblle
@@ -70,6 +47,16 @@ Don't forget to load the required JS modules in your app.js like so:
 const express = require("express");
 const { useTreblle } = require("treblle");
 ```
+
+## Migrating from v1.x to v2.x
+
+### Configuration options (⚠️ Breaking changes)
+
+- The old `apiKey` value is now called `sdkToken` to match our new naming conventions
+- The old `projectId` value is now called `apiKey` to match our new naming convetions
+- `showErrors` is now renamed to `debug` for more clarity 
+
+For more details on other changes and improvments please take a look at the [Changelog](#changelog) section. 
 
 ## Getting started
 
@@ -632,6 +619,19 @@ blocklistPaths: /^\/(admin|health|metrics)/;
 blocklistPaths: ["admin", /^\/api\/v1\/internal/];
 ```
 
+## Changelog
+
+### v2.0
+- Dramatically improved networking perfomrance 
+- Dramatically improved memory usage and consumption
+- Dramatically improved masking perfomrance
+- Added support for Hono
+- Extended support for Cloudflare Workers
+- Added built-in endpoint detection
+- Improved Debugging
+- Improved Readme with more examples
+
+
 ## Troubleshooting
 
 ### Common Issues
@@ -782,5 +782,5 @@ If you have problems of any kind feel free to reach out via <https://treblle.com
 
 ## License
 
-Copyright 2021, Treblle Limited. Licensed under the MIT license:
+Copyright 2025, Treblle Inc. Licensed under the MIT license:
 http://www.opensource.org/licenses/mit-license.php
