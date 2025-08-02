@@ -540,7 +540,7 @@ function sendKoaPayloadToTreblle(
   sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
 }
 
-function sendHonoPayloadToTreblle(
+async function sendHonoPayloadToTreblle(
   honoContext,
   { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error }
 ) {
@@ -551,11 +551,20 @@ function sendHonoPayloadToTreblle(
     error,
     fieldsToMaskMap,
   });
-
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
+  return sendPayloadToTreblleApiAsync({
+    apiKey: sdkToken,
+    trebllePayload,
+    debug,
+  });
 }
 
 function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug }) {
+  sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }).then(
+    () => {},
+    () => {}
+  );
+}
+async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }) {
   let f;
   if (typeof fetch === "function") {
     f = fetch;
@@ -574,7 +583,7 @@ function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug }) {
 
   const endpoint = getRandomEndpoint();
 
-  f(endpoint, {
+  await f(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
