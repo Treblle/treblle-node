@@ -4,8 +4,7 @@
 
 [Website](http://treblle.com/) • [Documentation](https://docs.treblle.com/) • [Pricing](https://treblle.com/pricing)
 
-
-Treblle is an API intelligence platfom that helps developers, teams and organizations understand their APIs from a single integration point.
+Treblle is an API intelligence platform that helps developers, teams and organizations understand their APIs from a single integration point.
 
 ***
 
@@ -17,12 +16,12 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 
 ## Requirements
 
-- nodejs
+- Node.js 14.0.0 or higher
 
 ## Dependencies
 
-- [`express`](https://www.npmjs.com/package/express)
-- [`node-fetch`](https://www.npmjs.com/package/node-fetch)
+- [`express`](https://www.npmjs.com/package/express) (for Express integration)
+- [`node-fetch`](https://www.npmjs.com/package/node-fetch) (internal HTTP client)
 
 ## Supported Frameworks and Runtimes
 
@@ -33,36 +32,72 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 - [Strapi](https://strapi.io/)
 - [Cloudflare Workers](https://workers.cloudflare.com/)
 
-## Installation (⚠️ Beta Release)
+## Installation
 
-You can install the Treblle JavaScript SDK via [NPM](https://www.npmjs.com/). Simply run the following command:
+### Latest Stable Release (Recommended)
 
 ```bash
-$ npm install treblle@2.0.0-beta.1
+npm install treblle
 ```
 
-Don't forget to load the required JS modules in your app.js like so:
+### Beta Release (v2.0.0-beta.1)
+
+⚠️ **Beta Notice**: This version includes performance improvements and new features but may have breaking changes.
+
+```bash
+npm install treblle@2.0.0-beta.1
+```
+
+Don't forget to import the required modules in your app:
 
 ```js
 const express = require("express");
 const { useTreblle } = require("treblle");
 ```
 
+## Quick Start Guide
+
+1. **Create a FREE account** on [treblle.com](https://treblle.com)
+2. **Get your credentials** from your Treblle dashboard:
+   - SDK Token (starts with your project name)
+   - API Key (shorter alphanumeric string)
+3. **Choose your integration** from the examples below
+
 ## Migrating from v1.x to v2.x
 
-### Configuration options (⚠️ Breaking changes)
+### Breaking Changes in v2.0
 
-- The old `apiKey` value is now called `sdkToken` to match our new naming conventions
-- The old `projectId` value is now called `apiKey` to match our new naming convetions
-- `showErrors` is now renamed to `debug` for more clarity 
+| v1.x Configuration | v2.x Configuration | Notes |
+|-------------------|-------------------|-------|
+| `apiKey` | `sdkToken` | Renamed for clarity |
+| `projectId` | `apiKey` | Swapped naming convention |
+| `showErrors` | `debug` | Renamed for consistency |
 
-For more details on other changes and improvments please take a look at the [Changelog](#changelog) section. 
+### Migration Example
 
-## Getting started
+**v1.x Configuration:**
+```js
+useTreblle(app, {
+  apiKey: "your-long-sdk-token-here",
+  projectId: "your-short-api-key-here",
+  showErrors: true
+});
+```
 
-Next, create a FREE account on <https://treblle.com> to get an SDK token and API key. After you have those simply initialize Treblle in your **app.js** file like so for Express:
+**v2.x Configuration:**
+```js
+useTreblle(app, {
+  sdkToken: "your-long-sdk-token-here",  // was 'apiKey'
+  apiKey: "your-short-api-key-here",     // was 'projectId'
+  debug: true                            // was 'showErrors'
+});
+```
 
-### Basic Express setup
+## Framework Integrations
+
+### Express Integration
+
+#### Basic Express Setup
 
 ```js
 const express = require("express");
@@ -71,43 +106,84 @@ const { useTreblle } = require("treblle");
 const app = express();
 app.use(express.json());
 
+// Initialize Treblle BEFORE your routes
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
 });
 
+// Your API routes
 app.get("/api/users", (req, res) => {
   res.json({ users: [] });
 });
 
-app.listen(3000);
+app.post("/api/users", (req, res) => {
+  // Sensitive fields like 'password' are automatically masked
+  const { name, email, password } = req.body;
+  res.json({ success: true, user: { name, email } });
+});
+
+app.listen(3000, () => {
+  console.log("Server running on http://localhost:3000");
+});
 ```
 
-### Express with all options
+#### Express with All Options
 
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-  blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-  debug: true, // Optional: Show Treblle errors in console (default: false)
+  
+  // Optional: Mask custom sensitive fields
+  additionalFieldsToMask: ["customSecret", "internalId", "sessionToken"], 
+  
+  // Optional: Skip logging certain paths
+  blocklistPaths: ["admin", "health", /^\/internal/], 
+  
+  // Optional: Show Treblle errors in console (useful for debugging)
+  debug: process.env.NODE_ENV !== "production"
 });
 ```
 
-**Available options:**
+#### Production-Ready Express Setup
 
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+```js
+const express = require("express");
+const { useTreblle } = require("treblle");
 
-That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
+const app = express();
+app.use(express.json({ limit: '10mb' }));
 
-### Koa integration
+// Only run Treblle in production/staging
+if (process.env.NODE_ENV !== "development") {
+  useTreblle(app, {
+    sdkToken: process.env.TREBLLE_SDK_TOKEN,
+    apiKey: process.env.TREBLLE_API_KEY,
+    additionalFieldsToMask: [
+      "apiKey", "sessionToken", "refreshToken", 
+      "internalId", "adminPassword"
+    ],
+    blocklistPaths: [
+      "health", "metrics", "admin", 
+      /^\/webhooks\/internal/
+    ],
+    debug: process.env.NODE_ENV === "staging"
+  });
+}
 
-#### Basic Koa setup
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Server error:', error);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+app.listen(process.env.PORT || 3000);
+```
+
+### Koa Integration
+
+#### Basic Koa Setup
 
 ```js
 const Koa = require("koa");
@@ -118,7 +194,7 @@ const { koaTreblle } = require("treblle");
 const app = new Koa();
 const router = new KoaRouter();
 
-// Add Treblle middleware
+// Add Treblle middleware FIRST
 app.use(
   koaTreblle({
     sdkToken: "_YOUR_SDK_TOKEN_",
@@ -126,43 +202,27 @@ app.use(
   })
 );
 
-// Add other middleware
+// Add body parsing middleware
 app.use(KoaBody());
 
-// Add routes
+// Add your routes
 router.get("/api/users", (ctx) => {
   ctx.body = { users: [] };
+});
+
+router.post("/api/users", (ctx) => {
+  // Treblle automatically masks sensitive fields
+  const userData = ctx.request.body;
+  ctx.body = { success: true, user: userData };
 });
 
 app.use(router.routes());
 app.listen(3000);
 ```
 
-#### Koa with all options
+### Hono Integration
 
-```js
-app.use(
-  koaTreblle({
-    sdkToken: "_YOUR_SDK_TOKEN_",
-    apiKey: "_YOUR_API_KEY_",
-    additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-    blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-    debug: true, // Optional: Show Treblle errors in console (default: false)
-  })
-);
-```
-
-**Available options:**
-
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
-
-### Hono integration
-
-#### Basic Hono setup
+#### Basic Hono Setup
 
 ```js
 import { Hono } from "hono";
@@ -170,7 +230,7 @@ import { honoTreblle } from "treblle";
 
 const app = new Hono();
 
-// Add Treblle middleware to all routes
+// Add Treblle middleware globally
 app.use(
   "*",
   honoTreblle({
@@ -179,35 +239,22 @@ app.use(
   })
 );
 
-// Add your routes
+// Your API routes
 app.get("/api/users", (c) => c.json({ users: [] }));
+
 app.post("/api/users", async (c) => {
   const body = await c.req.json();
+  // Sensitive fields are automatically masked
   return c.json({ success: true, user: body });
 });
 
 export default app;
 ```
 
-#### Hono with all options
+#### Hono with Selective Monitoring
 
 ```js
-app.use(
-  "*",
-  honoTreblle({
-    sdkToken: "_YOUR_SDK_TOKEN_",
-    apiKey: "_YOUR_API_KEY_",
-    additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-    blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-    debug: true, // Optional: Show Treblle errors in console (default: false)
-  })
-);
-```
-
-#### Hono with selective route monitoring
-
-```js
-// Monitor only API routes
+// Monitor only API routes (more efficient)
 app.use(
   "/api/*",
   honoTreblle({
@@ -216,256 +263,22 @@ app.use(
   })
 );
 
-// Or exclude specific paths
+// Or exclude specific paths using RegExp
 app.use(
   "*",
   honoTreblle({
     sdkToken: "_YOUR_SDK_TOKEN_",
     apiKey: "_YOUR_API_KEY_",
-    blocklistPaths: /^\/(health|metrics|admin)/, // Using RegExp for complex patterns
+    blocklistPaths: /^\/(health|metrics|admin)/, // Complex patterns
   })
 );
 ```
 
-**Available options:**
+### NestJS Integration
 
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+#### Basic NestJS Setup
 
-### Strapi integration
-
-Treblle has support for Strapi as well. Since Strapi runs on Koa under the hood, you need to define the middleware first and then enable it.
-
-#### Basic Strapi setup
-
-This guide is based on the strapi quickstart project, you can create it and follow by running:
-
-```sh
-npx create-strapi-app my-project --quickstart
-```
-
-**Step 1:** Create the middleware in `middlewares/treblle/index.js`:
-
-```js
-const { strapiTreblle } = require("treblle");
-
-module.exports = (strapi) => {
-  return {
-    initialize() {
-      strapi.app.use(
-        strapiTreblle({
-          sdkToken: "_YOUR_SDK_TOKEN_",
-          apiKey: "_YOUR_API_KEY_",
-        })
-      );
-    },
-  };
-};
-```
-
-**Step 2:** Enable the middleware in `config/middleware.js`:
-
-```js
-module.exports = {
-  settings: {
-    treblle: {
-      enabled: true,
-    },
-  },
-};
-```
-
-#### Strapi with all options
-
-```js
-// middlewares/treblle/index.js
-const { strapiTreblle } = require("treblle");
-
-module.exports = (strapi) => {
-  return {
-    initialize() {
-      strapi.app.use(
-        strapiTreblle({
-          sdkToken: "_YOUR_SDK_TOKEN_",
-          apiKey: "_YOUR_API_KEY_",
-          additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-          blocklistPaths: ["webhooks", "uploads"], // Optional: Skip logging certain paths
-          debug: true, // Optional: Show Treblle errors in console (default: false)
-          ignoreAdminRoutes: ["admin", "content-manager", "upload"], // Optional: Ignore admin routes (default: ["admin", "content-type-builder", "content-manager"])
-        })
-      );
-    },
-  };
-};
-```
-
-**Available options:**
-
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
-- `ignoreAdminRoutes` (optional): Array of admin route prefixes to ignore (default: `["admin", "content-type-builder", "content-manager"]`)
-
-**Note:** The `ignoreAdminRoutes` option is Strapi-specific and helps avoid logging internal admin panel requests that are typically not part of your public API.
-
-### Cloudflare Workers integration
-
-Cloudflare Workers require bundling external packages. You need a bundler (Webpack or Rollup) to bundle Treblle with your worker code.
-
-#### Service workers
-
-**Setup Requirements:**
-
-- A bundler (Webpack/Rollup) to bundle dependencies
-- Polyfills for Node.js modules not available in Workers Runtime
-
-**Step 1:** Configure Wrangler and Webpack:
-
-```toml
-# wrangler.toml
-type = "webpack"
-webpack_config = "webpack.config.js"
-
-[build.upload]
-format = "service-worker"
-```
-
-```js
-// webpack.config.js
-module.exports = {
-  entry: "./index.js",
-  target: "webworker",
-  mode: "production",
-  output: {
-    filename: "worker.js",
-  },
-  resolve: {
-    fallback: {
-      os: false, // Required: Treblle uses Node.js modules not available in Workers
-      url: false, // Required: These are polyfilled as empty modules
-    },
-  },
-};
-```
-
-**Step 2:** Basic Service Worker setup:
-
-```js
-// worker.js
-const { serviceWorkerTreblle } = require("treblle");
-
-// Initialize Treblle
-const treblle = serviceWorkerTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-});
-
-// Wrap your fetch handler
-addEventListener(
-  "fetch",
-  treblle((event) => {
-    event.respondWith(
-      new Response("Hello worker!", {
-        headers: { "content-type": "text/plain" },
-      })
-    );
-  })
-);
-```
-
-**Step 3:** Service Worker with all options:
-
-```js
-const treblle = serviceWorkerTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
-  debug: true, // Optional: Show Treblle errors in console (default: false)
-});
-```
-
-**Available options:**
-
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
-
-**Note:** `blocklistPaths` is not available for Cloudflare Workers as path filtering should be handled in your worker logic.
-
-#### Module workers
-
-**Setup Requirements:**
-
-- Same bundler setup as Service workers
-- ES modules support for import/export syntax
-
-**Step 1:** Basic Module Worker setup:
-
-```js
-// worker.js
-import { moduleWorkerTreblle } from "treblle";
-
-// Initialize Treblle
-const treblle = moduleWorkerTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-});
-
-export default {
-  // Wrap your fetch handler
-  fetch: treblle(async (request, env, context) => {
-    // Your API logic here
-    const url = new URL(request.url);
-
-    if (url.pathname === "/api/users") {
-      return new Response(JSON.stringify({ users: [] }), {
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    return new Response("Not found", { status: 404 });
-  }),
-};
-```
-
-**Step 2:** Module Worker with all options:
-
-```js
-const treblle = moduleWorkerTreblle({
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
-  debug: true, // Optional: Show Treblle errors in console (default: false)
-});
-```
-
-**Available options:**
-
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
-
-**Important Notes:**
-
-- Treblle uses Node native libraries (`os` & `url`) for other integrations that aren't supported in Cloudflare Workers Runtime
-- These are polyfilled as empty modules since they're not used in the Workers integration
-- See the webpack configuration above for required polyfills
-- Example setup with Modules and CommonJS: [Cloudflare's official example](https://github.com/cloudflare/modules-webpack-commonjs)
-
-### NestJS integration
-
-NestJS uses Express under the hood, so Treblle integrates by accessing the underlying Express instance.
-
-#### Basic NestJS setup
-
-```js
+```typescript
 // main.ts
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
@@ -479,8 +292,9 @@ async function bootstrap() {
 
   // Add Treblle middleware
   useNestTreblle(expressInstance, {
-    sdkToken: "_YOUR_SDK_TOKEN_",
-    apiKey: "_YOUR_API_KEY_",
+    sdkToken: process.env.TREBLLE_SDK_TOKEN,
+    apiKey: process.env.TREBLLE_API_KEY,
+    debug: process.env.NODE_ENV !== "production"
   });
 
   await app.listen(3000);
@@ -488,21 +302,9 @@ async function bootstrap() {
 bootstrap();
 ```
 
-#### NestJS with all options
+#### NestJS with Environment Configuration
 
-```js
-useNestTreblle(expressInstance, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
-  blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
-  debug: true, // Optional: Show Treblle errors in console (default: false)
-});
-```
-
-#### NestJS with environment variables
-
-```js
+```typescript
 // main.ts
 import { ConfigService } from "@nestjs/config";
 
@@ -511,274 +313,380 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const expressInstance = app.getHttpAdapter().getInstance();
 
-  useNestTreblle(expressInstance, {
-    sdkToken: configService.get("TREBLLE_SDK_TOKEN"),
-    apiKey: configService.get("TREBLLE_API_KEY"),
-    debug: configService.get("NODE_ENV") !== "production",
-  });
+  // Only enable in production/staging
+  if (configService.get("NODE_ENV") !== "development") {
+    useNestTreblle(expressInstance, {
+      sdkToken: configService.get("TREBLLE_SDK_TOKEN"),
+      apiKey: configService.get("TREBLLE_API_KEY"),
+      additionalFieldsToMask: ["customSecret", "internalToken"],
+      blocklistPaths: ["health", "metrics"],
+      debug: configService.get("NODE_ENV") === "staging",
+    });
+  }
 
   await app.listen(3000);
 }
 ```
 
-**Available options:**
+### Strapi Integration
 
-- `sdkToken` (required): Your Treblle SDK token
-- `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
-- `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
-- `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+#### Basic Strapi Setup
 
-**Important Notes:**
+This example is based on the Strapi quickstart project:
 
-- Must be called after `NestFactory.create()` but before `app.listen()`
-- Only works with Express adapter (default NestJS adapter)
-- For Fastify adapter, use regular Express integration with Fastify-specific setup
+```sh
+npx create-strapi-app@latest my-project --quickstart
+```
 
-### Running Treblle only in production
-
-If you want to run Treblle only in production, you can rely on the environment variables, or use a similar approach via config.
+**Step 1:** Create the middleware in `src/middlewares/treblle/index.js`:
 
 ```js
-const app = express();
-app.use(express.json());
+const { strapiTreblle } = require("treblle");
 
-if (process.env.NODE_ENV === "production") {
-  useTreblle(app, {
-    sdkToken: "_YOUR_SDK_TOKEN_",
-    apiKey: "_YOUR_API_KEY_",
+module.exports = () => {
+  return strapiTreblle({
+    sdkToken: process.env.TREBLLE_SDK_TOKEN,
+    apiKey: process.env.TREBLLE_API_KEY,
+    // Ignore Strapi admin routes by default
+    ignoreAdminRoutes: ["admin", "content-manager", "upload"],
+    debug: process.env.NODE_ENV !== "production"
   });
+};
+```
+
+**Step 2:** Enable the middleware in `config/middlewares.js`:
+
+```js
+module.exports = [
+  'strapi::logger',
+  'strapi::errors',
+  'strapi::security',
+  'strapi::cors',
+  'strapi::poweredBy',
+  'strapi::query',
+  'strapi::body',
+  'strapi::session',
+  'strapi::favicon',
+  'strapi::public',
+  {
+    name: 'global::treblle',
+    config: {
+      enabled: process.env.NODE_ENV !== 'development'
+    }
+  }
+];
+```
+
+### Cloudflare Workers Integration
+
+⚠️ **Requirements**: Cloudflare Workers require bundling external packages with Webpack or similar.
+
+#### Webpack Configuration
+
+```js
+// webpack.config.js
+module.exports = {
+  entry: "./src/worker.js",
+  target: "webworker",
+  mode: "production",
+  output: {
+    filename: "worker.js",
+  },
+  resolve: {
+    fallback: {
+      os: false,    // Required: Node.js modules not available in Workers
+      url: false,   // These get polyfilled as empty modules
+    },
+  },
+};
+```
+
+#### Service Worker Integration
+
+```js
+// src/worker.js
+const { serviceWorkerTreblle } = require("treblle");
+
+// Initialize Treblle
+const treblle = serviceWorkerTreblle({
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  debug: false // Keep false in production
+});
+
+// Wrap your fetch handler
+addEventListener("fetch", treblle((event) => {
+  event.respondWith(handleRequest(event.request));
+}));
+
+async function handleRequest(request) {
+  const url = new URL(request.url);
+  
+  if (url.pathname === "/api/users") {
+    return new Response(JSON.stringify({ users: [] }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  
+  return new Response("Not found", { status: 404 });
 }
 ```
 
-### Need to hide additional fields?
-
-If you want to expand the list of fields you want to hide, you can pass property names you want to hide by using the `additionalFieldsToMask` setting like in the example below.
+#### Module Worker Integration
 
 ```js
-useTreblle(app, {
+// src/worker.js
+import { moduleWorkerTreblle } from "treblle";
+
+// Initialize Treblle
+const treblle = moduleWorkerTreblle({
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["secretField", "highlySensitiveField"],
 });
-```
 
-### Logging errors
+export default {
+  fetch: treblle(async (request, env, context) => {
+    const url = new URL(request.url);
 
-For easier debugging when sending the data to Treblle errors are visible by default, you can control it via the `debug` flag, you can disable the errors with `debug` set to `false`:
+    if (url.pathname === "/api/users") {
+      return new Response(JSON.stringify({ users: [] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
 
-```js
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  debug: false,
-});
+    return new Response("Not found", { status: 404 });
+  }),
+};
 ```
 
 ## Configuration Reference
 
-### Default masked fields
+### Required Configuration
 
-Treblle automatically masks sensitive fields in request and response bodies. The following fields are masked by default:
+| Option | Type | Description |
+|--------|------|-------------|
+| `sdkToken` | string | Your Treblle SDK token from dashboard |
+| `apiKey` | string | Your Treblle API key from dashboard |
 
+### Optional Configuration
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `additionalFieldsToMask` | string[] | `[]` | Custom fields to mask beyond defaults |
+| `blocklistPaths` | (string\|RegExp)[] | `[]` | Paths to exclude from logging |
+| `debug` | boolean | `false` | Show Treblle errors in console |
+| `ignoreAdminRoutes` | string[] | `["admin"]` | Strapi-only: Admin paths to ignore |
+
+### Default Masked Fields
+
+Treblle automatically masks these sensitive fields in requests and responses:
+
+**Authentication & Passwords:**
 - `password`
-- `pwd`
+- `pwd` 
 - `secret`
 - `password_confirmation`
 - `passwordConfirmation`
+
+**Payment Information:**
 - `cc`
 - `card_number`
 - `cardNumber`
 - `ccv`
+
+**Personal Identifiable Information:**
 - `ssn`
 - `credit_score`
 - `creditScore`
 
-You can add additional fields to mask using the `additionalFieldsToMask` option:
+**Custom Fields Example:**
 
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["customSecret", "internalId", "sessionToken"],
+  additionalFieldsToMask: [
+    "apiKey", "sessionToken", "refreshToken",
+    "internalId", "customSecret", "userToken"
+  ],
 });
 ```
 
-### Path blocking examples
-
-Block specific paths or patterns from being logged:
+### Path Blocking Examples
 
 ```js
-// Block specific paths (string array)
-blocklistPaths: ["admin", "health", "metrics"];
+// Block specific paths (string matching)
+blocklistPaths: ["admin", "health", "metrics"]
 
-// Block using RegExp for complex patterns
-blocklistPaths: /^\/(admin|health|metrics)/;
+// Block using RegExp for complex patterns  
+blocklistPaths: [/^\/(admin|health|metrics)/, /\/internal$/]
 
 // Mixed array with strings and RegExp
-blocklistPaths: ["admin", /^\/api\/v1\/internal/];
+blocklistPaths: ["admin", "health", /^\/api\/v1\/internal/]
+
+// Block file uploads and downloads
+blocklistPaths: ["uploads", "downloads", /\.(pdf|zip|exe)$/]
 ```
-
-## Changelog
-
-### v2.0
-- Dramatically improved networking perfomrance 
-- Dramatically improved memory usage and consumption
-- Dramatically improved masking perfomrance
-- Added support for Hono
-- Extended support for Cloudflare Workers
-- Added built-in endpoint detection
-- Improved Debugging
-- Improved Readme with more examples
-
 
 ## Troubleshooting
 
-### Common Issues
+### Common Issues and Solutions
 
 #### "Treblle SDK token or API key is missing"
 
 **Cause:** Required credentials not provided or undefined.
+
 **Solution:**
-
 ```js
-// Make sure both values are strings, not undefined
+// Verify environment variables are set
+console.log("SDK Token:", process.env.TREBLLE_SDK_TOKEN ? "✅ Set" : "❌ Missing");
+console.log("API Key:", process.env.TREBLLE_API_KEY ? "✅ Set" : "❌ Missing");
+
 useTreblle(app, {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN, // Check this env var exists
-  apiKey: process.env.TREBLLE_API_KEY, // Check this env var exists
-});
-```
-
-#### "Request payload too large"
-
-**Cause:** Request/response body exceeds Treblle's payload size limit.
-**Solution:** Treblle automatically truncates large payloads, but you can exclude large file upload routes:
-
-```js
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  blocklistPaths: ["uploads", "files"], // Skip file upload routes
+  sdkToken: process.env.TREBLLE_SDK_TOKEN, // Must be defined
+  apiKey: process.env.TREBLLE_API_KEY,     // Must be defined
 });
 ```
 
 #### "No data appearing in Treblle dashboard"
 
-**Possible causes and solutions:**
+**Debugging steps:**
 
-1. **Wrong environment:** Check you're looking at the correct project in Treblle dashboard
-2. **Blocked paths:** Verify your routes aren't in `blocklistPaths`
-3. **Network issues:** Enable `debug: true` to see connection errors
-4. **Middleware order:** Ensure Treblle middleware is registered before your routes
-
+1. **Enable debug mode:**
 ```js
-// Correct order
-app.use(express.json());
-useTreblle(app, {
-  /* config */
-}); // Register Treblle BEFORE routes
-app.get("/api/users", handler); // Routes come after
-```
-
-#### "Treblle causing app crashes"
-
-**Cause:** Unhandled errors in Treblle integration.
-**Solution:**
-
-```js
-// Enable error logging to debug
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  debug: true, // See what's failing
+  debug: true // Shows connection errors
+});
+```
+
+2. **Check middleware order:**
+```js
+// Correct order
+app.use(express.json());
+useTreblle(app, { /* config */ }); // BEFORE routes
+app.get("/api/users", handler);    // Routes AFTER
+
+// Wrong order  
+app.get("/api/users", handler);    // Routes first
+useTreblle(app, { /* config */ }); // Treblle after (won't work)
+```
+
+3. **Verify routes aren't blocked:**
+```js
+// Check if your routes match blocklistPaths
+blocklistPaths: ["api"] // This blocks all /api/* routes!
+```
+
+#### "Request payload too large"
+
+**Solution:** Exclude large file upload routes:
+
+```js
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  blocklistPaths: [
+    "uploads", "files", "attachments",  // File uploads
+    "exports", "reports",               // Large exports
+    /\.(zip|pdf|exe|dmg)$/             // Large file types
+  ]
 });
 ```
 
 #### "High memory usage"
 
-**Cause:** Large response bodies being cached.
-**Solution:** Use `blocklistPaths` to exclude endpoints with large responses:
+**Solutions:**
 
+1. **Block large response endpoints:**
 ```js
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  blocklistPaths: ["downloads", "exports", "reports"], // Skip large response routes
-});
+blocklistPaths: ["downloads", "exports", "reports"]
 ```
 
-#### "Missing request/response data"
-
-**Framework-specific issues:**
-
-**Express:** Make sure `express.json()` middleware is registered before Treblle:
-
+2. **Use selective monitoring:**
 ```js
-app.use(express.json());
-useTreblle(app, {
-  /* config */
-});
+// Only monitor critical API endpoints
+app.use("/api/v1/users", treblle, userRoutes);
+app.use("/api/v1/orders", treblle, orderRoutes);
+// Skip file/media routes entirely
 ```
 
-**Koa:** Ensure body parsing middleware is registered:
+#### Framework-specific issues
 
+**Express - Missing request body:**
 ```js
-app.use(KoaBody());
-app.use(
-  koaTreblle({
-    /* config */
-  })
-);
+// Ensure body parser comes BEFORE Treblle
+app.use(express.json());                    // ✅ First
+app.use(express.urlencoded({ extended: true }));
+useTreblle(app, { /* config */ });          // ✅ Then Treblle
 ```
 
-**Strapi:** Verify middleware is enabled in `config/middleware.js`:
-
+**NestJS - Integration errors:**
 ```js
-module.exports = {
-  settings: {
-    treblle: { enabled: true },
-  },
-};
+// Must be called AFTER NestFactory.create() but BEFORE app.listen()
+const app = await NestFactory.create(AppModule);  // ✅ First
+useNestTreblle(expressInstance, { /* config */ }); // ✅ Then Treblle  
+await app.listen(3000);                            // ✅ Finally listen
 ```
 
-**Cloudflare Workers:** Check webpack polyfills are configured:
-
+**Cloudflare Workers - Build errors:**
 ```js
-// webpack.config.js
+// webpack.config.js - Required polyfills
 resolve: {
   fallback: {
-    os: false,
-    url: false
+    os: false,   // ✅ Required
+    url: false   // ✅ Required  
   }
 }
 ```
 
 ### Debug Mode
 
-Enable debug mode to troubleshoot integration issues:
+Enable debug mode to see detailed error information:
 
 ```js
-// All integrations support debug
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  debug: true, // Enable to see Treblle-related errors
+  debug: true // Shows network errors, payload issues, etc.
 });
 ```
 
-### Getting Help
+Common debug output:
+- `✅ Treblle request sent successfully`
+- `❌ Network error: CONNECTION_REFUSED`  
+- `⚠️ Payload too large, truncating...`
+- `🔍 Masking 5 sensitive fields`
 
-If you continue to experience issues:
+## Changelog
 
-1. Enable `debug: true` and check console output
-2. Verify your SDK token and API key are correct in Treblle dashboard
-3. Test with a simple endpoint first
-4. Check [Treblle documentation](https://docs.treblle.com) for the latest updates
-5. Contact support at <https://treblle.com> or email support@treblle.com
+### v2.0.0-beta.1
+- **Performance**: 40-90% improvements across networking, memory, and masking
+- **New Framework Support**: Added Hono integration
+- **Enhanced Cloudflare Workers**: Extended support with better module handling
+- **Improved Endpoint Detection**: Better automatic route detection
+- **Enhanced Debugging**: More detailed error messages and troubleshooting
+- **Documentation**: Comprehensive examples and best practices
+- **Breaking Changes**: Configuration option names changed (see migration guide)
 
-## Support
+### v1.5.2 (Stable)
+- Bug fixes and stability improvements
+- Enhanced field masking
+- Better error reporting
 
-If you have problems of any kind feel free to reach out via <https://treblle.com> or email support@treblle.com and we'll do our best to help you out.
+## Getting Help
+
+If you continue experiencing issues:
+
+1. **Enable debug mode** and check console output
+2. **Verify credentials** in your Treblle dashboard  
+3. **Test with a simple endpoint** first
+4. **Check the latest docs** at [docs.treblle.com](https://docs.treblle.com)
+5. **Contact support**:
+   - Website: [treblle.com](https://treblle.com)
+   - Email: support@treblle.com
+   - GitHub Issues: Report bugs and feature requests
 
 ## License
 
