@@ -4,10 +4,9 @@
 
 [Website](http://treblle.com/) • [Documentation](https://docs.treblle.com/) • [Pricing](https://treblle.com/pricing)
 
-
 Treblle is an API intelligence platfom that helps developers, teams and organizations understand their APIs from a single integration point.
 
-***
+---
 
 ## Treblle JavaScript SDK
 
@@ -54,9 +53,9 @@ const { useTreblle } = require("treblle");
 
 - The old `apiKey` value is now called `sdkToken` to match our new naming conventions
 - The old `projectId` value is now called `apiKey` to match our new naming convetions
-- `showErrors` is now renamed to `debug` for more clarity 
+- `showErrors` is now renamed to `debug` for more clarity
 
-For more details on other changes and improvments please take a look at the [Changelog](#changelog) section. 
+For more details on other changes and improvments please take a look at the [Changelog](#changelog) section.
 
 ## Getting started
 
@@ -622,7 +621,8 @@ blocklistPaths: ["admin", /^\/api\/v1\/internal/];
 ## Changelog
 
 ### v2.0
-- Dramatically improved networking perfomrance 
+
+- Dramatically improved networking perfomrance
 - Dramatically improved memory usage and consumption
 - Dramatically improved masking perfomrance
 - Added support for Hono
@@ -630,7 +630,6 @@ blocklistPaths: ["admin", /^\/api\/v1\/internal/];
 - Added built-in endpoint detection
 - Improved Debugging
 - Improved Readme with more examples
-
 
 ## Troubleshooting
 

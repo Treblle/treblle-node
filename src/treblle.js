@@ -361,6 +361,29 @@ function honoTreblle({
   };
 }
 
+async function honoTask({
+  c,
+  sdkToken,
+  apiKey,
+  requestStartTime,
+  fieldsToMaskMap,
+  debug,
+  error,
+}) {
+  try {
+    await captureHonoResponseBody(c);
+  } finally {
+    await sendHonoPayloadToTreblle(c, {
+      sdkToken,
+      apiKey,
+      requestStartTime,
+      fieldsToMaskMap,
+      debug,
+      error,
+    })
+  }
+}
+
 async function honoMiddlewareFn({
   c,
   next,
@@ -370,29 +393,33 @@ async function honoMiddlewareFn({
   debug,
 }) {
   const requestStartTime = process.hrtime();
+  const wrapper = 'executionCtx' in c ? c.executionCtx.waitUntil.bind(c.executionCtx) : (p) => p.catch(() => {})
 
   try {
     await next();
+    wrapper(
+      honoTask({
+        c,
+        sdkToken,
+        apiKey,
+        requestStartTime,
+        fieldsToMaskMap,
+        debug,
+      })
+    );
 
-    // Capture response body for Hono
-    await captureHonoResponseBody(c);
-
-    sendHonoPayloadToTreblle(c, {
-      sdkToken,
-      apiKey,
-      requestStartTime,
-      fieldsToMaskMap,
-      debug,
-    });
   } catch (error) {
-    sendHonoPayloadToTreblle(c, {
-      sdkToken,
-      apiKey,
-      requestStartTime,
-      fieldsToMaskMap,
-      debug,
-      error,
-    });
+    wrapper(
+      honoTask({
+        c,
+        sdkToken,
+        apiKey,
+        requestStartTime,
+        fieldsToMaskMap,
+        debug,
+        error,
+      })
+    );
     throw error;
   }
 }
