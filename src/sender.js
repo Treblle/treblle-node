@@ -647,19 +647,58 @@ function logRequestFailed(error) {
 }
 
 /**
- * Calculates the request duration.
+ * Creates a platform-aware start time for duration measurement
+ * @returns {number[]|number} hrtime array for Node.js or timestamp for other platforms
+ */
+function createStartTime() {
+  // Check if we're in Node.js environment with process.hrtime
+  if (typeof process !== 'undefined' && process.hrtime && typeof process.hrtime === 'function') {
+    return process.hrtime();
+  }
+  // Fallback to performance.now() for Cloudflare Workers and browsers
+  else if (typeof performance !== 'undefined' && performance.now) {
+    return performance.now();
+  }
+  // Last fallback to Date.now()
+  else {
+    return Date.now();
+  }
+}
+
+/**
+ * Calculates the request duration in milliseconds.
  *
- * @param {number[]} startTime
- * @returns {number}
+ * @param {number[]|number} startTime
+ * @returns {number} Duration in milliseconds
  */
 function getRequestDuration(startTime) {
-  const NS_PER_SEC = 1e9;
-  const NS_TO_MICRO = 1e3;
-  const diff = process.hrtime(startTime);
+  // Handle Node.js hrtime format
+  if (Array.isArray(startTime) && startTime.length === 2) {
+    if (typeof process !== 'undefined' && process.hrtime && typeof process.hrtime === 'function') {
+      const NS_PER_SEC = 1e9;
+      const NS_TO_MS = 1e6;
+      const diff = process.hrtime(startTime);
+      const milliseconds = (diff[0] * NS_PER_SEC + diff[1]) / NS_TO_MS;
+      return Math.ceil(milliseconds);
+    }
+    // If we have hrtime format but no process.hrtime, return 0
+    return 0;
+  }
+  
+  // Handle performance.now() or Date.now() format (already in milliseconds)
+  if (typeof startTime === 'number') {
+    let endTime;
+    if (typeof performance !== 'undefined' && performance.now) {
+      endTime = performance.now();
+    } else {
+      endTime = Date.now();
+    }
+    // Return milliseconds
+    return Math.ceil(endTime - startTime);
+  }
 
-  const microseconds = (diff[0] * NS_PER_SEC + diff[1]) / NS_TO_MICRO;
-
-  return Math.ceil(microseconds);
+  // Fallback: if we can't determine timing, return 0
+  return 0;
 }
 
 function getRequestUrl(req) {
@@ -845,4 +884,5 @@ module.exports = {
   getPayloadSize,
   checkPayloadSize,
   getRandomEndpoint,
+  createStartTime,
 };

@@ -4,6 +4,7 @@ const {
   sendExpressPayloadToTreblle,
   sendKoaPayloadToTreblle,
   sendHonoPayloadToTreblle,
+  createStartTime,
 } = require("./sender");
 
 /**
@@ -392,7 +393,7 @@ async function honoMiddlewareFn({
   fieldsToMaskMap,
   debug,
 }) {
-  const requestStartTime = process.hrtime();
+  const requestStartTime = createStartTime();
   const wrapper = 'executionCtx' in c ? c.executionCtx.waitUntil.bind(c.executionCtx) : (p) => p.catch(() => {})
 
   try {
