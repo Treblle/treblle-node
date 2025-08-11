@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "2.0.0-beta.2",
+  "version": "2.0.0-beta.3",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "types": "index.d.ts",

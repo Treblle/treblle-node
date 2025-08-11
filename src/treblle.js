@@ -138,7 +138,7 @@ function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, debug }) {
 
     // no routes
     if (!router) {
-      debug("no routes defined on app");
+      if (debug) console.log("no routes defined on app");
       done();
       return;
     }
