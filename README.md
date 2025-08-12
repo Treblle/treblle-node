@@ -16,21 +16,31 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 
 ## Requirements
 
-- nodejs
+- **Node.js**: `>=14.0.0` (supports all LTS versions from 14.x onwards)
+- **Supported Framework**: Express, NestJS, Koa, Hono, Strapi, or Cloudflare Workers
 
 ## Dependencies
 
-- [`express`](https://www.npmjs.com/package/express)
-- [`node-fetch`](https://www.npmjs.com/package/node-fetch)
+### Core Dependencies (All Frameworks)
+- [`stack-trace`](https://www.npmjs.com/package/stack-trace) - Error stack parsing and debugging
+
+### Runtime-Specific Dependencies
+- [`node-fetch`](https://www.npmjs.com/package/node-fetch) - HTTP client (Node.js environments only)
+  - **Used by**: Express, NestJS, Koa, Hono (Node.js), Strapi
+  - **Not needed**: Cloudflare Workers (uses native `fetch`)
+
+**Note**: Framework dependencies (Express, Koa, etc.) are peer dependencies - install the version your project uses.
 
 ## Supported Frameworks and Runtimes
 
-- [Express](https://expressjs.com/)
-- [NestJS](https://nestjs.com/)
-- [Koa](https://koajs.com/)
-- [Hono](https://hono.dev/)
-- [Strapi](https://strapi.io/)
-- [Cloudflare Workers](https://workers.cloudflare.com/)
+| Framework | Supported Versions | Node.js Requirement | Status | Notes |
+|-----------|-------------------|---------------------|--------|-------|
+| **[Express](https://expressjs.com/)** | `4.x`, `5.x` | `>=14.0.0` | ✅ Full Support | Both versions fully supported |
+| **[NestJS](https://nestjs.com/)** | `9.x`, `10.x`, `11.x` | `>=16.0.0` | ✅ Full Support | Built on Express/Fastify |
+| **[Koa](https://koajs.com/)** | `2.x`, `3.x` | `>=18.0.0` | ✅ Full Support | Modern async/await support |
+| **[Hono](https://hono.dev/)** | `4.x` | `>=16.0.0` | ✅ Full Support | Multi-runtime (Node.js, Bun, Deno) |
+| **[Strapi](https://strapi.io/)** | `4.x`, `5.x` | `>=18.0.0` LTS | ✅ Full Support | Built on Koa |
+| **[Cloudflare Workers](https://workers.cloudflare.com/)** | Workers Runtime | Web Standards API | ✅ Full Support | V8-based runtime |
 
 ## Installation (⚠️ Beta Release)
 
@@ -52,10 +62,19 @@ const { useTreblle } = require("treblle");
 ### Configuration options (⚠️ Breaking changes)
 
 - The old `apiKey` value is now called `sdkToken` to match our new naming conventions
-- The old `projectId` value is now called `apiKey` to match our new naming convetions
+- The old `projectId` value is now called `apiKey` to match our new naming conventions
 - `showErrors` is now renamed to `debug` for more clarity
 
-For more details on other changes and improvments please take a look at the [Changelog](#changelog) section.
+```js
+// This continues to work in v2.0+
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_", // renamed from apiKey  
+  apiKey: "_YOUR_API_KEY_",     // renamed from projectId
+  debug: true                   // renamed from showErrors
+});
+```
+
+For more details on other changes and improvements please take a look at the [Changelog](#changelog) section.
 
 ## Getting started
 
@@ -70,6 +89,7 @@ const { useTreblle } = require("treblle");
 const app = express();
 app.use(express.json());
 
+// Treblle automatically adds both request/response and error handling middleware
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
@@ -81,6 +101,17 @@ app.get("/api/users", (req, res) => {
 
 app.listen(3000);
 ```
+
+**Note on Middleware Ordering**: Ensure Treblle is registered after body parsing middleware:
+   ```js
+   app.use(express.json());        // First: body parsing
+   app.use(express.urlencoded({ extended: true }));
+   
+   useTreblle(app, { /* config */ }); // Then: Treblle
+   
+   // Finally: your routes
+   app.get('/api/users', handler);
+   ```
 
 ### Express with all options
 
@@ -622,148 +653,17 @@ blocklistPaths: ["admin", /^\/api\/v1\/internal/];
 
 ### v2.0
 
-- Dramatically improved networking perfomrance
+- **Express v5 Support**: Full compatibility with both Express 4.x and 5.x
+- **Improved Express Integration**: Replaced invasive method patching with standard middleware patterns
+- **Better Error Handling**: Uses proper Express error middleware instead of overriding internal methods
+- Dramatically improved networking performance
 - Dramatically improved memory usage and consumption
-- Dramatically improved masking perfomrance
+- Dramatically improved masking performance
 - Added support for Hono
 - Extended support for Cloudflare Workers
 - Added built-in endpoint detection
 - Improved Debugging
 - Improved Readme with more examples
-
-## Troubleshooting
-
-### Common Issues
-
-#### "Treblle SDK token or API key is missing"
-
-**Cause:** Required credentials not provided or undefined.
-**Solution:**
-
-```js
-// Make sure both values are strings, not undefined
-useTreblle(app, {
-  sdkToken: process.env.TREBLLE_SDK_TOKEN, // Check this env var exists
-  apiKey: process.env.TREBLLE_API_KEY, // Check this env var exists
-});
-```
-
-#### "Request payload too large"
-
-**Cause:** Request/response body exceeds Treblle's payload size limit.
-**Solution:** Treblle automatically truncates large payloads, but you can exclude large file upload routes:
-
-```js
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  blocklistPaths: ["uploads", "files"], // Skip file upload routes
-});
-```
-
-#### "No data appearing in Treblle dashboard"
-
-**Possible causes and solutions:**
-
-1. **Wrong environment:** Check you're looking at the correct project in Treblle dashboard
-2. **Blocked paths:** Verify your routes aren't in `blocklistPaths`
-3. **Network issues:** Enable `debug: true` to see connection errors
-4. **Middleware order:** Ensure Treblle middleware is registered before your routes
-
-```js
-// Correct order
-app.use(express.json());
-useTreblle(app, {
-  /* config */
-}); // Register Treblle BEFORE routes
-app.get("/api/users", handler); // Routes come after
-```
-
-#### "Treblle causing app crashes"
-
-**Cause:** Unhandled errors in Treblle integration.
-**Solution:**
-
-```js
-// Enable error logging to debug
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  debug: true, // See what's failing
-});
-```
-
-#### "High memory usage"
-
-**Cause:** Large response bodies being cached.
-**Solution:** Use `blocklistPaths` to exclude endpoints with large responses:
-
-```js
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  blocklistPaths: ["downloads", "exports", "reports"], // Skip large response routes
-});
-```
-
-#### "Missing request/response data"
-
-**Framework-specific issues:**
-
-**Express:** Make sure `express.json()` middleware is registered before Treblle:
-
-```js
-app.use(express.json());
-useTreblle(app, {
-  /* config */
-});
-```
-
-**Koa:** Ensure body parsing middleware is registered:
-
-```js
-app.use(KoaBody());
-app.use(
-  koaTreblle({
-    /* config */
-  })
-);
-```
-
-**Strapi:** Verify middleware is enabled in `config/middleware.js`:
-
-```js
-module.exports = {
-  settings: {
-    treblle: { enabled: true },
-  },
-};
-```
-
-**Cloudflare Workers:** Check webpack polyfills are configured:
-
-```js
-// webpack.config.js
-resolve: {
-  fallback: {
-    os: false,
-    url: false
-  }
-}
-```
-
-### Debug Mode
-
-Enable debug mode to troubleshoot integration issues:
-
-```js
-// All integrations support debug
-useTreblle(app, {
-  sdkToken: "_YOUR_SDK_TOKEN_",
-  apiKey: "_YOUR_API_KEY_",
-  debug: true, // Enable to see Treblle-related errors
-});
-```
 
 ### Getting Help
 

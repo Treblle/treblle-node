@@ -1,10 +1,17 @@
 const { maskSensitiveValues } = require("./maskFields");
 const os = require("os");
-const fetch = require("node-fetch");
 const stackTrace = require("stack-trace");
 const VERSION = require("../package.json").version;
 const http = require("http");
 const https = require("https");
+
+// Try to import node-fetch (only needed in Node.js environments)
+let nodeFetch = null;
+try {
+  nodeFetch = require("node-fetch");
+} catch (error) {
+  // node-fetch not available, will use runtime fetch detection
+}
 
 // Try to import Hono route helpers (optional dependency)
 let honoRouteHelpers = null;
@@ -566,13 +573,18 @@ function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug }) {
 }
 async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }) {
   let f;
+  // Check for global fetch first (Cloudflare Workers, modern Node.js)
   if (typeof fetch === "function") {
     f = fetch;
-  } else if (fetch && typeof fetch.default === "function") {
-    f = fetch.default;
+  } 
+  // Check for node-fetch (Node.js environments)
+  else if (nodeFetch && typeof nodeFetch === "function") {
+    f = nodeFetch;
+  } else if (nodeFetch && typeof nodeFetch.default === "function") {
+    f = nodeFetch.default;
   } else {
     if (debug) {
-      console.warn("Treblle error: fetch is not defined");
+      console.warn("Treblle error: No fetch implementation available. Install node-fetch for Node.js environments.");
     }
     return;
   }

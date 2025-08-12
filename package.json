@@ -1,6 +1,6 @@
 {
   "name": "treblle",
-  "version": "2.0.0-beta.3",
+  "version": "2.0.0-beta.4",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "types": "index.d.ts",
@@ -16,13 +16,17 @@
     "url": "git+https://github.com/Treblle/treblle-node.git"
   },
   "keywords": [
-    "node",
-    "express",
-    "koajs",
-    "nestjs",
-    "hono",
     "treblle",
-    "middleware"
+    "api",
+    "observability",
+    "intelligence",
+    "express",
+    "koa",
+    "nestjs", 
+    "hono",
+    "strapi",
+    "cloudflare-workers",
+    "api-intelligence"
   ],
   "author": "Treblle<support@treblle.com>",
   "license": "MIT",
@@ -31,11 +35,33 @@
   },
   "homepage": "https://github.com/Treblle/treblle-node#readme",
   "dependencies": {
-    "finalhandler": "~1.1.2",
-    "node-fetch": "^2.6.1",
     "stack-trace": "0.0.10"
   },
+  "peerDependencies": {
+    "express": "^4.0.0 || ^5.0.0",
+    "koa": "^2.0.0 || ^3.0.0",
+    "@nestjs/core": "^9.0.0 || ^10.0.0 || ^11.0.0",
+    "hono": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "express": {
+      "optional": true
+    },
+    "koa": {
+      "optional": true
+    },
+    "@nestjs/core": {
+      "optional": true
+    },
+    "hono": {
+      "optional": true
+    }
+  },
+  "optionalDependencies": {
+    "node-fetch": "^2.6.1"
+  },
   "devDependencies": {
+    "express": "^5.0.1",
     "prettier": "^2.3.2"
   }
 }

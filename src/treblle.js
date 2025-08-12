@@ -1,4 +1,3 @@
-const finalhandler = require("finalhandler");
 const { generateFieldsToMaskMap } = require("./maskFields");
 const {
   sendExpressPayloadToTreblle,
@@ -30,13 +29,24 @@ const useTreblle = function (
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, debug });
+  
+  // Use standard middleware approach instead of patching
   app.use(
     TreblleMiddleware({
       sdkToken,
       apiKey,
       fieldsToMaskMap,
       blocklistPaths,
+      debug,
+    })
+  );
+
+  // Add error handling middleware
+  app.use(
+    TreblleErrorMiddleware({
+      sdkToken,
+      apiKey,
+      fieldsToMaskMap,
       debug,
     })
   );
@@ -67,13 +77,8 @@ const useNestTreblle = function (
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  patchApp(app, {
-    sdkToken,
-    apiKey,
-    fieldsToMaskMap,
-    debug,
-    blocklistPaths,
-  });
+  
+  // Use standard middleware approach instead of patching
   app.use(
     TreblleMiddleware({
       sdkToken,
@@ -85,65 +90,55 @@ const useNestTreblle = function (
     })
   );
 
+  // Add error handling middleware
+  app.use(
+    TreblleErrorMiddleware({
+      sdkToken,
+      apiKey,
+      fieldsToMaskMap,
+      debug,
+    })
+  );
+
   return app;
 };
 
 /**
- * Takes the express app and overrides it's methods
- * so we can integrate Treblle middleware into it.
+ * Error handling middleware for Treblle.
+ * This replaces the invasive app.handle patching with standard Express error middleware.
  *
- * @param {object} app Express app
  * @param {object} settings
  * @param {string} settings.sdkToken Treblle SDK token
  * @param {string} settings.apiKey Treblle API key
- * @param {object} settings.additionalFieldsToMask specificy additional fields to hide
- * @returns {undefined}
+ * @param {object} settings.fieldsToMaskMap map of fields to mask
+ * @param {boolean} settings.debug controls error logging
+ * @returns {function} Express error middleware
  */
-function patchApp(app, { sdkToken, apiKey, fieldsToMaskMap, debug }) {
-  // we need to overwrite the default send to be able to access the response body
-  const originalSend = app.response.send;
-  app.response.send = function sendOverWrite(body) {
-    originalSend.call(this, body);
-    // this is a workaround so we can access the response body
-    this.__treblle_body_response = body;
-  };
-
-  // We override ExpressJS's app.handle function to avoid having to register our own error handling middleware,
-  // This way we do things a bit more hacky but the user doesn't have to register 2 middlewares: a regular one and a error handling one.
-  app.handle = function handle(req, res, callback) {
-    var router = this._router;
-    let self = this;
-
-    function expandedLogError(error) {
+function TreblleErrorMiddleware({
+  sdkToken,
+  apiKey,
+  fieldsToMaskMap,
+  debug,
+}) {
+  return function _TreblleErrorMiddleware(err, req, res, next) {
+    try {
+      // Send error data to Treblle
       sendExpressPayloadToTreblle(req, res, {
-        error,
+        error: err,
         sdkToken,
         apiKey,
         fieldsToMaskMap,
-        // in case of error the request time will be faulty
-        requestStartTime: process.hrtime(),
+        requestStartTime: req._treblleStartTime || process.hrtime(),
         debug,
       });
-
-      logerror.call(self, error);
+    } catch (treblleError) {
+      if (debug) {
+        console.error('Treblle error middleware failed:', treblleError);
+      }
     }
-
-    // final handler
-    var done =
-      callback ||
-      finalhandler(req, res, {
-        env: this.get("env"),
-        onerror: expandedLogError,
-      });
-
-    // no routes
-    if (!router) {
-      if (debug) console.log("no routes defined on app");
-      done();
-      return;
-    }
-
-    router.handle(req, res, done);
+    
+    // Always call next to pass the error to the next error handler
+    next(err);
   };
 }
 
@@ -158,18 +153,12 @@ function TreblleMiddleware({
   return function _TreblleMiddlewareHandler(req, res, next) {
     try {
       const requestStartTime = process.hrtime();
+      req._treblleStartTime = requestStartTime;
+
+      // Non-invasive response body capture using response event listeners
+      captureResponseBody(res);
 
       res.on("finish", function () {
-        if (
-          !isNestjs &&
-          (res.statusCode === 500 ||
-            res.statusMessage === "Internal Server Error")
-        ) {
-          // This prevents duplicate payload sending to Treblle API in case we have an error.
-          // The error will get caught by the app.handle's error handler.
-          return next();
-        }
-
         // Check if the request path is blocked
         const isPathBlocked =
           blocklistPaths instanceof RegExp
@@ -187,10 +176,42 @@ function TreblleMiddleware({
         }
       });
     } catch (err) {
-      console.error(err);
+      if (debug) {
+        console.error('Treblle middleware error:', err);
+      }
     } finally {
       next && next();
     }
+  };
+}
+
+/**
+ * Non-invasive response body capture that works with both Express v4 and v5
+ * @param {object} res Express response object
+ */
+function captureResponseBody(res) {
+  const originalSend = res.send;
+  const originalJson = res.json;
+  const originalEnd = res.end;
+
+  // Override send method
+  res.send = function(body) {
+    res.__treblle_body_response = body;
+    return originalSend.call(this, body);
+  };
+
+  // Override json method
+  res.json = function(obj) {
+    res.__treblle_body_response = obj;
+    return originalJson.call(this, obj);
+  };
+
+  // Override end method as fallback
+  res.end = function(chunk, encoding) {
+    if (chunk && !res.__treblle_body_response) {
+      res.__treblle_body_response = chunk;
+    }
+    return originalEnd.call(this, chunk, encoding);
   };
 }
 
@@ -316,10 +337,6 @@ async function koaMiddlewareFn({
   }
 }
 
-function logerror(err) {
-  /* istanbul ignore next */
-  if (this.get("env") !== "test") console.error(err.stack || err.toString());
-}
 
 /**
  * Treblle middleware for Hono.
