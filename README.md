@@ -121,6 +121,7 @@ useTreblle(app, {
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
   blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
+  ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
   debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
@@ -131,6 +132,7 @@ useTreblle(app, {
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
+- `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
@@ -177,6 +179,7 @@ app.use(
     apiKey: "_YOUR_API_KEY_",
     additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
+    ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
     debug: true, // Optional: Show Treblle errors in console (default: false)
   })
 );
@@ -188,6 +191,7 @@ app.use(
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
+- `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 ### Hono integration
@@ -229,6 +233,7 @@ app.use(
     apiKey: "_YOUR_API_KEY_",
     additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
+    ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
     debug: true, // Optional: Show Treblle errors in console (default: false)
   })
 );
@@ -263,6 +268,7 @@ app.use(
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
+- `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
 ### Strapi integration
@@ -323,6 +329,7 @@ module.exports = (strapi) => {
           apiKey: "_YOUR_API_KEY_",
           additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
           blocklistPaths: ["webhooks", "uploads"], // Optional: Skip logging certain paths
+          ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
           debug: true, // Optional: Show Treblle errors in console (default: false)
           ignoreAdminRoutes: ["admin", "content-manager", "upload"], // Optional: Ignore admin routes (default: ["admin", "content-type-builder", "content-manager"])
         })
@@ -338,6 +345,7 @@ module.exports = (strapi) => {
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
+- `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 - `ignoreAdminRoutes` (optional): Array of admin route prefixes to ignore (default: `["admin", "content-type-builder", "content-manager"]`)
 
@@ -526,6 +534,7 @@ useNestTreblle(expressInstance, {
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["customSecret", "internalId"], // Optional: Mask additional fields
   blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
+  ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
   debug: true, // Optional: Show Treblle errors in console (default: false)
 });
 ```
@@ -557,9 +566,10 @@ async function bootstrap() {
 - `apiKey` (required): Your Treblle API key
 - `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
+- `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
 
-**Important Notes:**
+**Important Notes:
 
 - Must be called after `NestFactory.create()` but before `app.listen()`
 - Only works with Express adapter (default NestJS adapter)
@@ -631,6 +641,60 @@ useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["customSecret", "internalId", "sessionToken"],
+});
+```
+
+### Default blocked paths
+
+Treblle automatically blocks common browser requests and static files from being logged to avoid noise in your API monitoring. The following paths and patterns are blocked by default:
+
+**Specific Files:**
+- `favicon.ico` - Browser icon requests
+- `robots.txt` - Search engine crawler instructions
+- `sitemap.xml` - Website sitemap files
+- `manifest.json` - Progressive Web App manifest
+- `sw.js` / `service-worker.js` - Service worker files
+- `apple-touch-icon*` - iOS home screen icons
+- `browserconfig.xml` - IE/Edge configuration
+- `crossdomain.xml` - Flash crossdomain policy
+- `ads.txt` - Advertising policy file
+
+**Directory Patterns:**
+- `/.well-known/` - IETF well-known URIs (certificates, etc.)
+- `/static/` - Static file directories
+- `/assets/` - Asset directories
+- `/public/` - Public file directories
+- `/images/` - Image directories
+- `/css/` - Stylesheet directories
+- `/js/` - JavaScript directories
+
+**File Extensions:**
+- Static assets: `.css`, `.js`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.ico`
+- Fonts: `.woff`, `.woff2`, `.ttf`, `.eot`
+
+#### Disabling default blocked paths
+
+If you want to log these requests (for example, to monitor static file access), you can disable the default blocking:
+
+```js
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  ignoreDefaultBlockedPaths: true, // Disable automatic blocking
+  blocklistPaths: ["favicon.ico"], // Manually specify what to block
+});
+```
+
+#### Combining with custom blocked paths
+
+By default, both the default blocked paths and your custom `blocklistPaths` are applied:
+
+```js
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  blocklistPaths: ["admin", "health"], // Custom blocks
+  // Default blocks (favicon.ico, robots.txt, etc.) still apply
 });
 ```
 

@@ -4,11 +4,11 @@ const stackTrace = require("stack-trace");
 const VERSION = require("../package.json").version;
 
 /**
- * Treblle API payload version - Float version used across all SDKs and frameworks.
- * This is decoupled from the package version to maintain consistency across different SDK implementations.
- * Update this when the Treblle API payload structure changes.
+ * Treblle API payload version - this should be incremented whenever the payload structure changes
+ * to ensure backward compatibility with older SDKs.
+ * The current version is 20 which would map to 2.0
  */
-const PAYLOAD_VERSION = 2.0;
+const PAYLOAD_VERSION = 20;
 
 const http = require("http");
 const https = require("https");

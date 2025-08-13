@@ -5,6 +5,42 @@ const {
   sendHonoPayloadToTreblle,
   createStartTime,
 } = require("./sender");
+const { DefaultBlockedPatterns } = require("./consts");
+
+/**
+ * Checks if a request path should be blocked from Treblle tracking
+ * @param {string} path - The request path to check
+ * @param {(string[]|RegExp|null)} userBlocklistPaths - User-defined blocked paths
+ * @param {boolean} ignoreDefaults - Whether to ignore default blocked patterns
+ * @returns {boolean} - True if the path should be blocked
+ */
+function isPathBlocked(path, userBlocklistPaths = [], ignoreDefaults = false) {
+  // Check user-defined blocklist first
+  if (userBlocklistPaths) {
+    if (userBlocklistPaths instanceof RegExp) {
+      if (userBlocklistPaths.test(path)) return true;
+    } else if (Array.isArray(userBlocklistPaths)) {
+      const isUserBlocked = userBlocklistPaths.some((blockedPath) => {
+        if (typeof blockedPath === 'string') {
+          return path.startsWith(`/${blockedPath}`) || path === `/${blockedPath}` || path === blockedPath;
+        }
+        if (blockedPath instanceof RegExp) {
+          return blockedPath.test(path);
+        }
+        return false;
+      });
+      if (isUserBlocked) return true;
+    }
+  }
+
+  // Check default blocked patterns (unless explicitly ignored)
+  if (!ignoreDefaults) {
+    const isDefaultBlocked = DefaultBlockedPatterns.some(pattern => pattern.test(path));
+    if (isDefaultBlocked) return true;
+  }
+
+  return false;
+}
 
 /**
  * Adds the Treblle middleware to the app.
@@ -15,6 +51,7 @@ const {
  * @param {string} settings.apiKey Treblle API key
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
+ * @param {boolean?} settings.ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} settings.debug controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
@@ -25,6 +62,7 @@ const useTreblle = function (
     apiKey,
     additionalFieldsToMask = [],
     blocklistPaths = [],
+    ignoreDefaultBlockedPaths = false,
     debug = false,
   }
 ) {
@@ -37,6 +75,7 @@ const useTreblle = function (
       apiKey,
       fieldsToMaskMap,
       blocklistPaths,
+      ignoreDefaultBlockedPaths,
       debug,
     })
   );
@@ -63,6 +102,7 @@ const useTreblle = function (
  * @param {string} settings.apiKey Treblle API key
  * @param {string[]?} settings.additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
+ * @param {boolean?} settings.ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} settings.debug controls error logging when sending data to Treblle
  * @returns {object} updated Express app
  */
@@ -73,6 +113,7 @@ const useNestTreblle = function (
     apiKey,
     additionalFieldsToMask = [],
     blocklistPaths = [],
+    ignoreDefaultBlockedPaths = false,
     debug = false,
   }
 ) {
@@ -84,8 +125,9 @@ const useNestTreblle = function (
       sdkToken,
       apiKey,
       fieldsToMaskMap,
-      debug,
       blocklistPaths,
+      ignoreDefaultBlockedPaths,
+      debug,
       isNestjs: true,
     })
   );
@@ -132,7 +174,7 @@ function TreblleErrorMiddleware({
         fieldsToMaskMap,
         requestStartTime: req._treblleStartTime || process.hrtime(),
         debug,
-        sdk: isNestjs ? "nestjs" : "express",
+        sdk: isNestjs ? "nest" : "express",
       });
     } catch (treblleError) {
       if (debug) {
@@ -150,6 +192,7 @@ function TreblleMiddleware({
   apiKey,
   fieldsToMaskMap,
   blocklistPaths,
+  ignoreDefaultBlockedPaths,
   debug,
   isNestjs,
 }) {
@@ -163,19 +206,16 @@ function TreblleMiddleware({
 
       res.on("finish", function () {
         // Check if the request path is blocked
-        const isPathBlocked =
-          blocklistPaths instanceof RegExp
-            ? blocklistPaths.test(req.path)
-            : blocklistPaths.some((path) => req.path.startsWith(`/${path}`));
+        const pathBlocked = isPathBlocked(req.path, blocklistPaths, ignoreDefaultBlockedPaths);
 
-        if (!isPathBlocked) {
+        if (!pathBlocked) {
           sendExpressPayloadToTreblle(req, res, {
             sdkToken,
             apiKey,
             requestStartTime,
             fieldsToMaskMap,
             debug,
-            sdk: isNestjs ? "nestjs" : "express",
+            sdk: isNestjs ? "nest" : "express",
           });
         }
       });
@@ -226,6 +266,7 @@ function captureResponseBody(res) {
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
+ * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
  * @returns {function} koa middleware function
  */
@@ -234,18 +275,16 @@ function koaTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
+  ignoreDefaultBlockedPaths = false,
   debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (ctx, next) {
     // Check if the request path is blocked
-    const isPathBlocked =
-      blocklistPaths instanceof RegExp
-        ? blocklistPaths.test(ctx.request.url)
-        : blocklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
+    const pathBlocked = isPathBlocked(ctx.request.url, blocklistPaths, ignoreDefaultBlockedPaths);
 
-    if (isPathBlocked) {
+    if (pathBlocked) {
       return next();
     }
 
@@ -267,6 +306,7 @@ function koaTreblle({
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
+ * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
  * @param {string[]} ignoreAdminRoutes controls logging /admin routes
  * @returns {function} koa middleware function
@@ -276,6 +316,7 @@ function strapiTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
+  ignoreDefaultBlockedPaths = false,
   debug = false,
   ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
@@ -289,12 +330,9 @@ function strapiTreblle({
     }
 
     // Check if the request path is blocked
-    const isPathBlocked =
-      blocklistPaths instanceof RegExp
-        ? blocklistPaths.test(ctx.request.url)
-        : blocklistPaths.some((path) => ctx.request.url.startsWith(`/${path}`));
+    const pathBlocked = isPathBlocked(ctx.request.url, blocklistPaths, ignoreDefaultBlockedPaths);
 
-    if (isPathBlocked) {
+    if (pathBlocked) {
       return next();
     }
 
@@ -353,6 +391,7 @@ async function koaMiddlewareFn({
  * @param {string} apiKey Treblle API key
  * @param {string[]?} additionalFieldsToMask specify additional fields to hide
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
+ * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
  * @returns {function} hono middleware function
  */
@@ -361,18 +400,16 @@ function honoTreblle({
   apiKey,
   additionalFieldsToMask = [],
   blocklistPaths = [],
+  ignoreDefaultBlockedPaths = false,
   debug = false,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (c, next) {
     // Check if the request path is blocked
-    const isPathBlocked =
-      blocklistPaths instanceof RegExp
-        ? blocklistPaths.test(c.req.url)
-        : blocklistPaths.some((path) => c.req.url.startsWith(`/${path}`));
+    const pathBlocked = isPathBlocked(c.req.url, blocklistPaths, ignoreDefaultBlockedPaths);
 
-    if (isPathBlocked) {
+    if (pathBlocked) {
       return next();
     }
 
