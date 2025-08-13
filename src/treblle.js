@@ -97,6 +97,7 @@ const useNestTreblle = function (
       apiKey,
       fieldsToMaskMap,
       debug,
+      isNestjs: true,
     })
   );
 
@@ -119,6 +120,7 @@ function TreblleErrorMiddleware({
   apiKey,
   fieldsToMaskMap,
   debug,
+  isNestjs,
 }) {
   return function _TreblleErrorMiddleware(err, req, res, next) {
     try {
@@ -130,6 +132,7 @@ function TreblleErrorMiddleware({
         fieldsToMaskMap,
         requestStartTime: req._treblleStartTime || process.hrtime(),
         debug,
+        sdk: isNestjs ? "nestjs" : "express",
       });
     } catch (treblleError) {
       if (debug) {
@@ -172,6 +175,7 @@ function TreblleMiddleware({
             requestStartTime,
             fieldsToMaskMap,
             debug,
+            sdk: isNestjs ? "nestjs" : "express",
           });
         }
       });
@@ -301,6 +305,7 @@ function strapiTreblle({
       apiKey,
       fieldsToMaskMap,
       debug,
+      sdk: "strapi",
     });
   };
 }
@@ -312,6 +317,7 @@ async function koaMiddlewareFn({
   apiKey,
   fieldsToMaskMap,
   debug,
+  sdk = "koa",
 }) {
   const requestStartTime = process.hrtime();
 
@@ -323,6 +329,7 @@ async function koaMiddlewareFn({
       requestStartTime,
       fieldsToMaskMap,
       debug,
+      sdk,
     });
   } catch (error) {
     sendKoaPayloadToTreblle(ctx, {
@@ -332,6 +339,7 @@ async function koaMiddlewareFn({
       fieldsToMaskMap,
       debug,
       error,
+      sdk,
     });
     throw error;
   }

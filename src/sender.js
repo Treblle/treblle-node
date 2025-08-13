@@ -2,6 +2,14 @@ const { maskSensitiveValues } = require("./maskFields");
 const os = require("os");
 const stackTrace = require("stack-trace");
 const VERSION = require("../package.json").version;
+
+/**
+ * Treblle API payload version - Float version used across all SDKs and frameworks.
+ * This is decoupled from the package version to maintain consistency across different SDK implementations.
+ * Update this when the Treblle API payload structure changes.
+ */
+const PAYLOAD_VERSION = 2.0;
+
 const http = require("http");
 const https = require("https");
 
@@ -156,7 +164,7 @@ function checkPayloadSize(payload) {
 const generateTrebllePayload = function (
   req,
   res,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, sdk = "express" }
 ) {
   const payload = req.method === "GET" ? req.query : req.body;
   const parsedPayload = getPayload(payload);
@@ -226,8 +234,8 @@ const generateTrebllePayload = function (
   let dataToSend = {
     api_key: sdkToken,
     project_id: apiKey,
-    version: VERSION,
-    sdk: "node",
+    version: PAYLOAD_VERSION,
+    sdk: sdk,
     data: {
       server: {
         timezone: CACHED_TIMEZONE,
@@ -346,8 +354,8 @@ const generateHonoTrebllePayload = function (
   let dataToSend = {
     api_key: sdkToken,
     project_id: apiKey,
-    version: VERSION,
-    sdk: "node",
+    version: PAYLOAD_VERSION,
+    sdk: "hono",
     data: {
       server: {
         timezone: CACHED_TIMEZONE,
@@ -402,7 +410,7 @@ const generateHonoTrebllePayload = function (
  */
 const generateKoaTrebllePayload = function (
   koaContext,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, sdk = "koa" }
 ) {
   const payload =
     koaContext.request.method === "GET"
@@ -475,8 +483,8 @@ const generateKoaTrebllePayload = function (
   let dataToSend = {
     api_key: sdkToken,
     project_id: apiKey,
-    version: VERSION,
-    sdk: "node",
+    version: PAYLOAD_VERSION,
+    sdk: sdk,
     data: {
       server: {
         timezone: CACHED_TIMEZONE,
@@ -519,7 +527,7 @@ const generateKoaTrebllePayload = function (
 function sendExpressPayloadToTreblle(
   req,
   res,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, debug }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, debug, sdk = "express" }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
     sdkToken,
@@ -527,6 +535,7 @@ function sendExpressPayloadToTreblle(
     requestStartTime,
     error,
     fieldsToMaskMap,
+    sdk,
   });
 
   sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
@@ -534,7 +543,7 @@ function sendExpressPayloadToTreblle(
 
 function sendKoaPayloadToTreblle(
   koaContext,
-  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error, sdk = "koa" }
 ) {
   let trebllePayload = generateKoaTrebllePayload(koaContext, {
     sdkToken,
@@ -542,6 +551,7 @@ function sendKoaPayloadToTreblle(
     requestStartTime,
     error,
     fieldsToMaskMap,
+    sdk,
   });
 
   sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
