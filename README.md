@@ -42,7 +42,7 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 | **[Strapi](https://strapi.io/)** | `4.x`, `5.x` | `>=18.0.0` LTS | ✅ Full Support | Built on Koa |
 | **[Cloudflare Workers](https://workers.cloudflare.com/)** | Workers Runtime | Web Standards API | ✅ Full Support | V8-based runtime |
 
-## Installation (⚠️ Beta Release)
+## Installation
 
 You can install the Treblle JavaScript SDK via [NPM](https://www.npmjs.com/). Simply run the following command:
 
