@@ -47,7 +47,7 @@ Treblle is an API intelligence platfom that helps developers, teams and organiza
 You can install the Treblle JavaScript SDK via [NPM](https://www.npmjs.com/). Simply run the following command:
 
 ```bash
-$ npm install treblle@2.0.0-beta.3
+$ npm install treblle@^2.0.0
 ```
 
 Don't forget to load the required JS modules in your app.js like so:
