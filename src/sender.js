@@ -673,13 +673,13 @@ function logRequestFailed(error) {
  * @returns {number[]|number} hrtime array for Node.js or timestamp for other platforms
  */
 function createStartTime() {
-  // Check if we're in Node.js environment with process.hrtime
-  if (typeof process !== 'undefined' && process.hrtime && typeof process.hrtime === 'function') {
-    return process.hrtime();
-  }
-  // Fallback to performance.now() for Cloudflare Workers and browsers
-  else if (typeof performance !== 'undefined' && performance.now) {
+  /// Use performance.now() if available
+  if (typeof performance !== 'undefined' && performance.now) {
     return performance.now();
+  }
+  // Fallback to process.hrtime() if we're in Node.js environment and its available
+  else if (typeof process !== 'undefined' && process.hrtime && typeof process.hrtime === 'function') {
+    return process.hrtime();
   }
   // Last fallback to Date.now()
   else {
