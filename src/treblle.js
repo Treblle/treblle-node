@@ -434,6 +434,7 @@ async function honoTask({
   error,
 }) {
   try {
+    await captureHonoRequestBody(c);
     await captureHonoResponseBody(c);
   } finally {
     await sendHonoPayloadToTreblle(c, {
@@ -484,6 +485,29 @@ async function honoMiddlewareFn({
       })
     );
     throw error;
+  }
+}
+
+async function captureHonoRequestBody(c) {
+  try {
+    if (c.req?.method !== 'GET') {
+      // Try to read as text first
+      let requestBody = null;
+
+      try {
+        requestBody = await c.req.json()
+      } catch {}
+
+      try {
+        requestBody = await c.req.text()
+      } catch {}
+
+      // Store captured body for later access
+      c.__treblle_body_request = requestBody;
+    }
+  } catch (error) {
+    // If capture fails, continue without body data
+    c.__treblle_body_request = null;
   }
 }
 
