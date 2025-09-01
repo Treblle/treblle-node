@@ -289,7 +289,7 @@ const generateHonoTrebllePayload = function (
   const payload =
     honoContext.req.method === "GET"
       ? honoContext.req.queries()
-      : honoContext.req.body;
+      : honoContext.__treblle_body_request
   const parsedPayload = getPayload(payload);
   const sizeCheckedPayload = checkPayloadSize(parsedPayload);
   const maskedRequestPayload = maskSensitiveValues(
@@ -298,7 +298,7 @@ const generateHonoTrebllePayload = function (
   );
 
   let responseBodySize = honoContext.__treblle_body_response_size || null;
-
+  
   let errors = [];
 
   let maskedResponseBody;
