@@ -297,6 +297,8 @@ const generateHonoTrebllePayload = function (
     fieldsToMaskMap
   );
 
+  let responseBodySize = honoContext.__treblle_body_response_size || null;
+  
   let errors = [];
 
   let maskedResponseBody;
@@ -325,6 +327,7 @@ const generateHonoTrebllePayload = function (
     }
   } catch {
     // if we can't parse the body we'll leave it empty and set an error
+    responseBodySize = null;
     errors.push({
       source: "onShutdown",
       type: "INVALID_JSON",
@@ -385,7 +388,7 @@ const generateHonoTrebllePayload = function (
           fieldsToMaskMap
         ),
         code: honoContext.res.status,
-        size: null, // Hono doesn't expose content length easily
+        size: responseBodySize,
         load_time: getRequestDuration(requestStartTime),
         body: maskedResponseBody !== undefined ? maskedResponseBody : null,
       },

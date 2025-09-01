@@ -517,27 +517,30 @@ async function captureHonoResponseBody(c) {
       // Clone the response to read the body without consuming it
       const clonedResponse = c.res.clone();
 
-      // Try to read as text first
-      let responseBody;
+      let responseBody, responseBodySize
+      if (clonedResponse.headers.has('content-length')) {
+        responseBodySize = parseInt(clonedResponse.headers.get('content-length'));
+      }
       try {
-        responseBody = await clonedResponse.text();
-      } catch {
-        // If text fails, try reading as arrayBuffer and convert
-        try {
-          const buffer = await clonedResponse.arrayBuffer();
-          responseBody = new TextDecoder().decode(buffer);
-        } catch {
-          // If all fails, leave it null
-          responseBody = null;
+        const buffer = await clonedResponse.arrayBuffer();
+        responseBody = new TextDecoder().decode(buffer);
+        if (!responseBodySize) {
+          responseBodySize = buffer.byteLength;
         }
+      } catch {
+        // If all fails, leave it null
+        responseBodySize = null;
+        responseBody = null;
       }
 
       // Store captured body for later access
       c.__treblle_body_response = responseBody;
+      c.__treblle_body_response_size = responseBodySize;
     }
   } catch (error) {
     // If capture fails, continue without body data
     c.__treblle_body_response = null;
+    c.__treblle_body_response_size = null;
   }
 }
 
