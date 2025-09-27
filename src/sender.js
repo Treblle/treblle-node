@@ -605,34 +605,31 @@ async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }) {
   const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
   const endpoint = getRandomEndpoint();
-
-  await f(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "Accept-Encoding": "gzip, deflate",
-      Connection: "keep-alive",
-      "User-Agent": `treblle-node/${VERSION}`,
-    },
-    body: JSON.stringify(trebllePayload),
-    agent: (url) => (url.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT),
-    timeout: 5000,
-    signal: controller.signal,
-  }).then(
-    (response) => {
-      clearTimeout(timeoutId);
-      if (debug && response.ok === false) {
-        logTreblleResponseError(response);
-      }
-    },
-    (error) => {
-      clearTimeout(timeoutId);
-      if (debug) {
-        logRequestFailed(error);
-      }
+  try {
+    const response = await f(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "Accept-Encoding": "gzip, deflate",
+        Connection: "keep-alive",
+        "User-Agent": `treblle-node/${VERSION}`,
+      },
+      body: JSON.stringify(trebllePayload),
+      agent: (url) => (url.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT),
+      timeout: 5000,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (debug && response.ok === false) {
+      await logTreblleResponseError(response);
     }
-  );
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (debug) {
+      await logRequestFailed(error);
+    }
+  }
 }
 
 async function logTreblleResponseError(response) {
