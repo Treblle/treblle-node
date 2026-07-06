@@ -9,6 +9,7 @@ async function sendPayload(
     apiKey,
     fieldsToMaskMap,
     debug = false,
+    endpoint,
     requestExecutionTime,
     error,
   }
@@ -21,7 +22,7 @@ async function sendPayload(
     error,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug, endpoint });
 }
 
 module.exports = {

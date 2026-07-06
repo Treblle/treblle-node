@@ -14,6 +14,10 @@ const {
   serviceWorkerTreblle,
 } = require("./src/cloudflare-workers/service-worker-treblle");
 
+const { DEFAULT_MASKED_KEYWORDS } = require("./src/maskFields");
+
+const { trackQuery } = require("./src/queryTracking");
+
 module.exports = {
   useTreblle,
   koaTreblle,
@@ -22,4 +26,6 @@ module.exports = {
   serviceWorkerTreblle,
   useNestTreblle,
   honoTreblle,
+  trackQuery,
+  DEFAULT_MASKED_KEYWORDS,
 };

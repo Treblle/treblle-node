@@ -29,6 +29,44 @@ try {
   // Hono route helpers not available, will use fallback methods
 }
 
+// Try to load zlib for outbound compression. Available in Node.js and in
+// Cloudflare Workers when `nodejs_compat` is enabled; absent otherwise, in
+// which case we transparently fall back to sending uncompressed JSON.
+let gzipAsync = null;
+try {
+  const zlib = require("zlib");
+  const { promisify } = require("util");
+  gzipAsync = promisify(zlib.gzip);
+} catch (error) {
+  // zlib unavailable in this runtime; payloads are sent uncompressed.
+}
+
+// Only compress bodies at or above this size. Below it the gzip CPU cost and
+// header overhead outweigh the bandwidth saved on already-tiny payloads.
+const GZIP_MIN_BYTES = 1024;
+
+/**
+ * Compresses the outbound JSON body with gzip when it's large enough to be
+ * worth it and zlib is available in this runtime. Never throws — on any
+ * failure it falls back to the original uncompressed string so a payload is
+ * always sent.
+ *
+ * @param {string} jsonBody serialized Treblle payload
+ * @returns {Promise<{body: (string|Buffer), encoding: (string|null)}>}
+ */
+async function maybeGzipBody(jsonBody) {
+  if (!gzipAsync || Buffer.byteLength(jsonBody) < GZIP_MIN_BYTES) {
+    return { body: jsonBody, encoding: null };
+  }
+  try {
+    const compressed = await gzipAsync(jsonBody);
+    return { body: compressed, encoding: "gzip" };
+  } catch (error) {
+    // Compression failed; send the plain string instead.
+    return { body: jsonBody, encoding: null };
+  }
+}
+
 // Cache expensive operations at module load
 const CACHED_OS_INFO = {
   name: os.platform(),
@@ -38,33 +76,64 @@ const CACHED_OS_INFO = {
 const CACHED_NODE_VERSION = process.version;
 const CACHED_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-// HTTP Agent with connection pooling and keep-alive
-const HTTP_AGENT = new http.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 30000, // 30 seconds
-  maxSockets: 10,
-  maxFreeSockets: 5,
-  timeout: 5000, // 5 second socket timeout
-});
+// HTTP Agents with connection pooling and keep-alive.
+//
+// These only apply to the node-fetch code path. Native/undici `fetch` (Node 18+)
+// ignores the `agent` option entirely and does its own connection pooling, so on
+// modern runtimes these are never used. Create them lazily to avoid allocating
+// two Agent objects (each with its own keep-alive timer) on the common native
+// path where they'd sit idle forever.
+let HTTP_AGENT = null;
+let HTTPS_AGENT = null;
+function getAgent(protocol) {
+  if (protocol === "https:") {
+    if (!HTTPS_AGENT) {
+      HTTPS_AGENT = new https.Agent({
+        keepAlive: true,
+        keepAliveMsecs: 30000,
+        maxSockets: 10,
+        maxFreeSockets: 5,
+        timeout: 5000,
+      });
+    }
+    return HTTPS_AGENT;
+  }
+  if (!HTTP_AGENT) {
+    HTTP_AGENT = new http.Agent({
+      keepAlive: true,
+      keepAliveMsecs: 30000, // 30 seconds
+      maxSockets: 10,
+      maxFreeSockets: 5,
+      timeout: 5000, // 5 second socket timeout
+    });
+  }
+  return HTTP_AGENT;
+}
 
-const HTTPS_AGENT = new https.Agent({
-  keepAlive: true,
-  keepAliveMsecs: 30000,
-  maxSockets: 10,
-  maxFreeSockets: 5,
-  timeout: 5000,
-});
+// Treblle ingress endpoint. All data is sent here.
+const TREBLLE_ENDPOINT = "https://ingress.treblle.com";
 
-// Treblle API endpoints for load balancing
-const TREBLLE_ENDPOINTS = [
-  "https://rocknrolla.treblle.com",
-  "https://sicario.treblle.com",
-  "https://punisher.treblle.com",
-];
+// Retained as an array (single entry) for backward compatibility with
+// consumers/tests that expect a list of known endpoints.
+const TREBLLE_ENDPOINTS = [TREBLLE_ENDPOINT];
 
 function getRandomEndpoint() {
-  const randomIndex = Math.floor(Math.random() * TREBLLE_ENDPOINTS.length);
-  return TREBLLE_ENDPOINTS[randomIndex];
+  return TREBLLE_ENDPOINT;
+}
+
+/**
+ * Resolves the endpoint to send data to. Falls back to the default ingress
+ * endpoint when no custom endpoint is configured. Accepts a full URL (e.g.
+ * "https://ingress-eu.treblle.com").
+ *
+ * @param {string?} endpoint user-configured endpoint
+ * @returns {string} the endpoint URL to send data to
+ */
+function resolveEndpoint(endpoint) {
+  if (typeof endpoint === "string" && endpoint.trim() !== "") {
+    return endpoint.trim();
+  }
+  return TREBLLE_ENDPOINT;
 }
 
 // Cache for timestamps to reduce Date object creation
@@ -164,7 +233,7 @@ function checkPayloadSize(payload) {
 const generateTrebllePayload = function (
   req,
   res,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, sdk = "express" }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, queries, sdk = "express" }
 ) {
   const payload = req.method === "GET" ? req.query : req.body;
   const parsedPayload = getPayload(payload);
@@ -221,13 +290,14 @@ const generateTrebllePayload = function (
 
   if (error) {
     const trace = stackTrace.parse(error);
+    const topFrame = Array.isArray(trace) && trace.length > 0 ? trace[0] : null;
 
     errors.push({
       source: "onException",
       type: "UNHANDLED_EXCEPTION",
-      message: error.message,
-      file: trace[0].getFileName(),
-      line: trace[0].getLineNumber(),
+      message: error && error.message ? error.message : String(error),
+      file: topFrame ? topFrame.getFileName() : null,
+      line: topFrame ? topFrame.getLineNumber() : null,
     });
   }
 
@@ -266,6 +336,7 @@ const generateTrebllePayload = function (
         body: maskedResponseBody !== undefined ? maskedResponseBody : null,
       },
       errors: errors,
+      queries: Array.isArray(queries) ? queries : [],
     },
   };
 
@@ -284,7 +355,7 @@ const generateTrebllePayload = function (
  */
 const generateHonoTrebllePayload = function (
   honoContext,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, queries }
 ) {
   const payload =
     honoContext.req.method === "GET"
@@ -342,13 +413,14 @@ const generateHonoTrebllePayload = function (
 
   if (error) {
     const trace = stackTrace.parse(error);
+    const topFrame = Array.isArray(trace) && trace.length > 0 ? trace[0] : null;
 
     errors.push({
       source: "onException",
       type: "UNHANDLED_EXCEPTION",
-      message: error.message,
-      file: trace[0].getFileName(),
-      line: trace[0].getLineNumber(),
+      message: error && error.message ? error.message : String(error),
+      file: topFrame ? topFrame.getFileName() : null,
+      line: topFrame ? topFrame.getLineNumber() : null,
     });
   }
 
@@ -393,6 +465,7 @@ const generateHonoTrebllePayload = function (
         body: maskedResponseBody !== undefined ? maskedResponseBody : null,
       },
       errors: errors,
+      queries: Array.isArray(queries) ? queries : [],
     },
   };
 
@@ -411,7 +484,7 @@ const generateHonoTrebllePayload = function (
  */
 const generateKoaTrebllePayload = function (
   koaContext,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, sdk = "koa" }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, queries, sdk = "koa" }
 ) {
   const payload =
     koaContext.request.method === "GET"
@@ -471,13 +544,14 @@ const generateKoaTrebllePayload = function (
 
   if (error) {
     const trace = stackTrace.parse(error);
+    const topFrame = Array.isArray(trace) && trace.length > 0 ? trace[0] : null;
 
     errors.push({
       source: "onException",
       type: "UNHANDLED_EXCEPTION",
-      message: error.message,
-      file: trace[0].getFileName(),
-      line: trace[0].getLineNumber(),
+      message: error && error.message ? error.message : String(error),
+      file: topFrame ? topFrame.getFileName() : null,
+      line: topFrame ? topFrame.getLineNumber() : null,
     });
   }
 
@@ -519,6 +593,7 @@ const generateKoaTrebllePayload = function (
         body: maskedResponseBody !== undefined ? maskedResponseBody : null,
       },
       errors: errors,
+      queries: Array.isArray(queries) ? queries : [],
     },
   };
 
@@ -528,7 +603,7 @@ const generateKoaTrebllePayload = function (
 function sendExpressPayloadToTreblle(
   req,
   res,
-  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, debug, sdk = "express" }
+  { sdkToken, apiKey, requestStartTime, error, fieldsToMaskMap, debug, endpoint, queries, sdk = "express" }
 ) {
   let trebllePayload = generateTrebllePayload(req, res, {
     sdkToken,
@@ -536,15 +611,16 @@ function sendExpressPayloadToTreblle(
     requestStartTime,
     error,
     fieldsToMaskMap,
+    queries,
     sdk,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug, endpoint });
 }
 
 function sendKoaPayloadToTreblle(
   koaContext,
-  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error, sdk = "koa" }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error, endpoint, queries, sdk = "koa" }
 ) {
   let trebllePayload = generateKoaTrebllePayload(koaContext, {
     sdkToken,
@@ -552,15 +628,16 @@ function sendKoaPayloadToTreblle(
     requestStartTime,
     error,
     fieldsToMaskMap,
+    queries,
     sdk,
   });
 
-  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug });
+  sendPayloadToTreblleApi({ apiKey: sdkToken, trebllePayload, debug, endpoint });
 }
 
 async function sendHonoPayloadToTreblle(
   honoContext,
-  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error }
+  { sdkToken, apiKey, requestStartTime, fieldsToMaskMap, debug, error, endpoint, queries }
 ) {
   let trebllePayload = generateHonoTrebllePayload(honoContext, {
     sdkToken,
@@ -568,31 +645,36 @@ async function sendHonoPayloadToTreblle(
     requestStartTime,
     error,
     fieldsToMaskMap,
+    queries,
   });
   return sendPayloadToTreblleApiAsync({
     apiKey: sdkToken,
     trebllePayload,
     debug,
+    endpoint,
   });
 }
 
-function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug }) {
-  sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }).then(
+function sendPayloadToTreblleApi({ apiKey, trebllePayload, debug, endpoint }) {
+  sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug, endpoint }).then(
     () => {},
     () => {}
   );
 }
-async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }) {
+async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug, endpoint }) {
   let f;
+  let usingNodeFetch = false;
   // Check for global fetch first (Cloudflare Workers, modern Node.js)
   if (typeof fetch === "function") {
     f = fetch;
-  } 
+  }
   // Check for node-fetch (Node.js environments)
   else if (nodeFetch && typeof nodeFetch === "function") {
     f = nodeFetch;
+    usingNodeFetch = true;
   } else if (nodeFetch && typeof nodeFetch.default === "function") {
     f = nodeFetch.default;
+    usingNodeFetch = true;
   } else {
     if (debug) {
       console.warn("Treblle error: No fetch implementation available. Install node-fetch for Node.js environments.");
@@ -604,22 +686,39 @@ async function sendPayloadToTreblleApiAsync({ apiKey, trebllePayload, debug }) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-  const endpoint = getRandomEndpoint();
+  const targetEndpoint = resolveEndpoint(endpoint);
+
+  const { body, encoding } = await maybeGzipBody(JSON.stringify(trebllePayload));
+
+  const headers = {
+    "Content-Type": "application/json",
+    "x-api-key": apiKey,
+    "Accept-Encoding": "gzip, deflate",
+    Connection: "keep-alive",
+    "User-Agent": `treblle-node/${VERSION}`,
+  };
+  if (encoding) {
+    headers["Content-Encoding"] = encoding;
+  }
+
+  const fetchOptions = {
+    method: "POST",
+    headers,
+    body,
+    signal: controller.signal,
+  };
+
+  // The `agent` and `timeout` options are only honored by node-fetch. The
+  // native/undici global fetch ignores them (and warns about unknown options),
+  // so only attach them when we're actually using node-fetch. Native fetch
+  // still gets its timeout enforced via the AbortController above.
+  if (usingNodeFetch) {
+    fetchOptions.agent = (url) => getAgent(url.protocol);
+    fetchOptions.timeout = 5000;
+  }
+
   try {
-    const response = await f(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "Accept-Encoding": "gzip, deflate",
-        Connection: "keep-alive",
-        "User-Agent": `treblle-node/${VERSION}`,
-      },
-      body: JSON.stringify(trebllePayload),
-      agent: (url) => (url.protocol === "https:" ? HTTPS_AGENT : HTTP_AGENT),
-      timeout: 5000,
-      signal: controller.signal,
-    });
+    const response = await f(targetEndpoint, fetchOptions);
     clearTimeout(timeoutId);
     if (debug && response.ok === false) {
       await logTreblleResponseError(response);
@@ -904,5 +1003,15 @@ module.exports = {
   getPayloadSize,
   checkPayloadSize,
   getRandomEndpoint,
+  resolveEndpoint,
   createStartTime,
+  // Exported for unit testing
+  maybeGzipBody,
+  GZIP_MIN_BYTES,
+  getRequestDuration,
+  transformToOpenAPIFormat,
+  getPayload,
+  TREBLLE_ENDPOINT,
+  TREBLLE_ENDPOINTS,
+  MAX_PAYLOAD_SIZE,
 };

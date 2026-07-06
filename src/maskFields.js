@@ -1,4 +1,8 @@
-const fieldsToMask = [
+// Default list of keywords that get masked in request/response bodies and
+// headers. This is the default *value* of the `additionalFieldsToMask` option:
+// consumers can replace it with their own list, extend it (spread this array),
+// or pass an empty array to turn masking off entirely.
+const DEFAULT_MASKED_KEYWORDS = [
   "password",
   "pwd",
   "secret",
@@ -11,6 +15,20 @@ const fieldsToMask = [
   "ssn",
   "credit_score",
   "creditScore",
+  // Authentication / session credentials commonly present in headers & bodies
+  "authorization",
+  "cookie",
+  "set-cookie",
+  "x-api-key",
+  "api_key",
+  "apikey",
+  "token",
+  "access_token",
+  "accessToken",
+  "refresh_token",
+  "refreshToken",
+  "bearer",
+  "x-auth-token",
 ];
 
 // Pre-generate common mask strings for performance
@@ -28,65 +46,107 @@ function getMaskString(length) {
 }
 
 /**
- * Generates an object of fields to mask.
+ * Generates a lookup map of the keywords to mask.
  *
  * We'll use an object because it's faster to check if a key exists in an object,
- * then it is to check if the key exists in an array.
+ * than it is to check if the key exists in an array.
  *
- * @param {string[]?} additionalFieldsToMask
- * @returns {object}
+ * The passed array is the authoritative list of keywords to mask. When it is
+ * omitted (undefined) the built-in {@link DEFAULT_MASKED_KEYWORDS} are used.
+ * When it is an empty array masking is disabled — we return `null` so callers
+ * (via {@link maskSensitiveValues}) can skip masking entirely.
+ *
+ * @param {string[]?} maskedKeywords the keywords to mask (defaults to the built-in list)
+ * @returns {object|null} lookup map, or null when masking is disabled
  */
-function generateFieldsToMaskMap(additionalFieldsToMask = []) {
-  const fieldsMap = {};
-  for (const field of fieldsToMask) {
-    fieldsMap[field] = true;
+function generateFieldsToMaskMap(maskedKeywords = DEFAULT_MASKED_KEYWORDS) {
+  if (!Array.isArray(maskedKeywords) || maskedKeywords.length === 0) {
+    // No keywords configured — masking is turned off.
+    return null;
   }
-  for (const field of additionalFieldsToMask) {
-    fieldsMap[field] = true;
+  const fieldsMap = {};
+  // Keys are stored lower-cased so matching is case-insensitive.
+  for (const field of maskedKeywords) {
+    fieldsMap[String(field).toLowerCase()] = true;
   }
   return fieldsMap;
 }
 
 /**
+ * Masks a value that belongs to a sensitive field, regardless of its type.
+ * Strings/numbers/booleans become a run of asterisks; nested
+ * objects/arrays are masked recursively so no leaf value leaks.
+ *
+ * @param {*} value
+ * @returns {*}
+ */
+function maskValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") return getMaskString(value.length);
+  if (typeof value === "number" || typeof value === "boolean") {
+    return getMaskString(String(value).length);
+  }
+  if (Array.isArray(value)) return value.map(maskValue);
+  if (typeof value === "object") {
+    const masked = {};
+    for (const key in value) {
+      masked[key] = maskValue(value[key]);
+    }
+    return masked;
+  }
+  return value;
+}
+
+/**
  * Takes an object representing the payload and masks its sensitive fields.
+ * Matching is case-insensitive and applies to values of any type.
+ *
+ * Uses a copy-on-write strategy: subtrees that contain no masked values are
+ * returned by reference rather than being rebuilt. In the common case where a
+ * request/response body has no sensitive fields, the original object flows
+ * straight through with zero extra allocation (the previous implementation
+ * deep-cloned every body on every request). The input is never mutated — a
+ * fresh container is allocated the moment a descendant actually changes.
  *
  * @param {object} payloadObject
  * @returns {object}
  */
 function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
-  if (typeof payloadObject === null) return null;
+  // No map means masking is disabled — the payload flows through untouched.
+  if (!fieldsToMaskMap) return payloadObject;
+  if (payloadObject === null || payloadObject === undefined) {
+    return payloadObject;
+  }
   if (typeof payloadObject !== "object") return payloadObject;
+
   if (Array.isArray(payloadObject)) {
-    return payloadObject.map((val) =>
-      maskSensitiveValues(val, fieldsToMaskMap)
-    );
+    let changed = false;
+    const out = new Array(payloadObject.length);
+    for (let i = 0; i < payloadObject.length; i++) {
+      const masked = maskSensitiveValues(payloadObject[i], fieldsToMaskMap);
+      out[i] = masked;
+      if (masked !== payloadObject[i]) changed = true;
+    }
+    return changed ? out : payloadObject;
   }
 
-  // Optimize: avoid object spread for better performance
-  let objectToMask = payloadObject;
+  // Alias the input; only clone once a value below us actually differs.
+  let safeObject = payloadObject;
+  for (const propName in payloadObject) {
+    const value = payloadObject[propName];
 
-  let safeObject = {};
-  for (const propName in objectToMask) {
-    if (typeof objectToMask[propName] === "string") {
-      if (fieldsToMaskMap[propName] === true) {
-        safeObject[propName] = getMaskString(objectToMask[propName].length);
-      } else {
-        safeObject[propName] = objectToMask[propName];
-      }
-    } else if (Array.isArray(objectToMask[propName])) {
-      safeObject[propName] = objectToMask[propName].map((val) =>
-        maskSensitiveValues(val, fieldsToMaskMap)
-      );
-    } else if (
-      typeof objectToMask[propName] === "object" &&
-      objectToMask[propName] !== null
-    ) {
-      safeObject[propName] = maskSensitiveValues(
-        objectToMask[propName],
-        fieldsToMaskMap
-      );
+    let masked;
+    if (fieldsToMaskMap[propName.toLowerCase()] === true) {
+      masked = maskValue(value);
+    } else if (value !== null && typeof value === "object") {
+      masked = maskSensitiveValues(value, fieldsToMaskMap);
     } else {
-      safeObject[propName] = objectToMask[propName];
+      masked = value;
+    }
+
+    if (masked !== value) {
+      if (safeObject === payloadObject) safeObject = { ...payloadObject };
+      safeObject[propName] = masked;
     }
   }
 
@@ -94,6 +154,7 @@ function maskSensitiveValues(payloadObject, fieldsToMaskMap) {
 }
 
 module.exports = {
+  DEFAULT_MASKED_KEYWORDS,
   generateFieldsToMaskMap,
   maskSensitiveValues,
 };

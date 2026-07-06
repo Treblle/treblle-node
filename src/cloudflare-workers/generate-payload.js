@@ -58,12 +58,13 @@ async function generatePayload(
 
   if (error) {
     const trace = stackTrace.parse(error);
+    const topFrame = Array.isArray(trace) && trace.length > 0 ? trace[0] : null;
     errors.push({
       source: "onException",
       type: "UNHANDLED_EXCEPTION",
-      message: error.message,
-      file: trace[0].getFileName(),
-      line: trace[0].getLineNumber(),
+      message: error && error.message ? error.message : String(error),
+      file: topFrame ? topFrame.getFileName() : null,
+      line: topFrame ? topFrame.getLineNumber() : null,
     });
   }
 

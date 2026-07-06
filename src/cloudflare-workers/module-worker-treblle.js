@@ -4,8 +4,9 @@ const { generateFieldsToMaskMap } = require("../maskFields");
 const moduleWorkerTreblle = function ({
   sdkToken,
   apiKey,
-  additionalFieldsToMask = [],
+  additionalFieldsToMask,
   debug = false,
+  endpoint,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
   return (fetch) => {
@@ -31,6 +32,7 @@ const moduleWorkerTreblle = function ({
           apiKey,
           fieldsToMaskMap,
           debug,
+          endpoint,
           requestExecutionTime: requestEndTime - requestStartTime,
           error,
         });

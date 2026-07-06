@@ -123,6 +123,7 @@ useTreblle(app, {
   blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
   ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
   debug: true, // Optional: Show Treblle errors in console (default: false)
+  endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
 });
 ```
 
@@ -130,12 +131,31 @@ useTreblle(app, {
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
 - `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 That's it. Your API requests and responses are now being sent to your Treblle project. Just by adding that line of code you get features like: auto-documentation, real-time request/response monitoring, error tracking and so much more.
+
+### Choosing where data is sent (custom endpoint / data region)
+
+By default the SDK sends all data to `https://ingress.treblle.com`. If you need
+your data to be processed in a specific region, set the `endpoint` option to the
+appropriate Treblle ingress URL. This option is supported by every framework
+integration (Express, NestJS, Koa, Hono, Strapi and Cloudflare Workers).
+
+```js
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  endpoint: "https://ingress-eu.treblle.com", // send data to the EU ingress
+});
+```
+
+When `endpoint` is omitted (or empty), the SDK falls back to the default
+`https://ingress.treblle.com`.
 
 ### Koa integration
 
@@ -181,6 +201,7 @@ app.use(
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
     ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
     debug: true, // Optional: Show Treblle errors in console (default: false)
+    endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
   })
 );
 ```
@@ -189,10 +210,11 @@ app.use(
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
 - `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 ### Hono integration
 
@@ -235,6 +257,7 @@ app.use(
     blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
     ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
     debug: true, // Optional: Show Treblle errors in console (default: false)
+    endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
   })
 );
 ```
@@ -266,10 +289,11 @@ app.use(
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
 - `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 ### Strapi integration
 
@@ -331,6 +355,7 @@ module.exports = (strapi) => {
           blocklistPaths: ["webhooks", "uploads"], // Optional: Skip logging certain paths
           ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
           debug: true, // Optional: Show Treblle errors in console (default: false)
+          endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
           ignoreAdminRoutes: ["admin", "content-manager", "upload"], // Optional: Ignore admin routes (default: ["admin", "content-type-builder", "content-manager"])
         })
       );
@@ -343,10 +368,11 @@ module.exports = (strapi) => {
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
 - `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 - `ignoreAdminRoutes` (optional): Array of admin route prefixes to ignore (default: `["admin", "content-type-builder", "content-manager"]`)
 
 **Note:** The `ignoreAdminRoutes` option is Strapi-specific and helps avoid logging internal admin panel requests that are typically not part of your public API.
@@ -424,6 +450,7 @@ const treblle = serviceWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
   debug: true, // Optional: Show Treblle errors in console (default: false)
+  endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
 });
 ```
 
@@ -431,8 +458,9 @@ const treblle = serviceWorkerTreblle({
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 **Note:** `blocklistPaths` is not available for Cloudflare Workers as path filtering should be handled in your worker logic.
 
@@ -480,6 +508,7 @@ const treblle = moduleWorkerTreblle({
   apiKey: "_YOUR_API_KEY_",
   additionalFieldsToMask: ["key1", "key2"], // Optional: Mask additional fields
   debug: true, // Optional: Show Treblle errors in console (default: false)
+  endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
 });
 ```
 
@@ -487,8 +516,9 @@ const treblle = moduleWorkerTreblle({
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 **Important Notes:**
 
@@ -536,6 +566,7 @@ useNestTreblle(expressInstance, {
   blocklistPaths: ["admin", "health"], // Optional: Skip logging certain paths
   ignoreDefaultBlockedPaths: false, // Optional: Disable default blocked paths (default: false)
   debug: true, // Optional: Show Treblle errors in console (default: false)
+  endpoint: "https://ingress-eu.treblle.com", // Optional: Custom ingress endpoint (default: https://ingress.treblle.com)
 });
 ```
 
@@ -564,10 +595,11 @@ async function bootstrap() {
 
 - `sdkToken` (required): Your Treblle SDK token
 - `apiKey` (required): Your Treblle API key
-- `additionalFieldsToMask` (optional): Array of field names to mask in addition to [default fields](#default-masked-fields)
+- `additionalFieldsToMask` (optional): Keywords to mask in request/response bodies and headers. Replaces the [default keywords](#default-masked-keywords) - spread `DEFAULT_MASKED_KEYWORDS` to extend them. Pass `[]` to [turn masking off](#turning-masking-off). See [Masking sensitive data](#masking-sensitive-data)
 - `blocklistPaths` (optional): Array of path prefixes or RegExp to exclude from logging
 - `ignoreDefaultBlockedPaths` (optional): Boolean to disable [default blocked paths](#default-blocked-paths) (default: false)
 - `debug` (optional): Boolean to show Treblle-related errors in console (default: false)
+- `endpoint` (optional): Custom Treblle ingress endpoint URL to send data to (default: `https://ingress.treblle.com`). Use this to send data to a region-specific ingress, e.g. `https://ingress-eu.treblle.com`
 
 **Important Notes:
 
@@ -593,13 +625,18 @@ if (process.env.NODE_ENV === "production") {
 
 ### Need to hide additional fields?
 
-If you want to expand the list of fields you want to hide, you can pass property names you want to hide by using the `additionalFieldsToMask` setting like in the example below.
+Use the `additionalFieldsToMask` setting to control which keywords are masked.
+Since it replaces the built-in defaults, spread `DEFAULT_MASKED_KEYWORDS` to keep
+them and add your own on top. See [Masking sensitive data](#masking-sensitive-data)
+for full details (including how to turn masking off).
 
 ```js
+const { useTreblle, DEFAULT_MASKED_KEYWORDS } = require("treblle");
+
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["secretField", "highlySensitiveField"],
+  additionalFieldsToMask: [...DEFAULT_MASKED_KEYWORDS, "secretField", "highlySensitiveField"],
 });
 ```
 
@@ -615,11 +652,85 @@ useTreblle(app, {
 });
 ```
 
+### Tracking database queries
+
+Treblle can show the SQL queries executed during each request (with their
+execution time) in the `data.queries` array of the payload. Node has no
+framework-wide "a query ran" event, so query tracking is **opt-in**: you wire
+your database layer's query event to Treblle's `trackQuery` helper **once**, and
+every query made during a request is captured automatically. Until you do this,
+`data.queries` is simply an empty array.
+
+`trackQuery(sql, time)` records a query against the request that is currently
+in flight (it uses `AsyncLocalStorage` under the hood, so you don't need access
+to `req`). It is a no-op when called outside of a request.
+
+> **Privacy:** Only pass the **parameterized** SQL string (e.g.
+> `SELECT * FROM users WHERE id = $1`) - never the parameter bindings. The ORM
+> events below already keep bindings separate, so no sensitive values are
+> captured. As a safety net, `trackQuery` also scrubs any inline string/number
+> literals it finds (replacing them with `?`).
+
+```js
+const { trackQuery } = require("treblle");
+```
+
+**Prisma** - enable the `query` event log and forward each event:
+
+```js
+const prisma = new PrismaClient({
+  log: [{ level: "query", emit: "event" }],
+});
+
+prisma.$on("query", (e) => trackQuery(e.query, e.duration));
+```
+
+> Note: Prisma emits `query` events on an internal async channel, which can lose
+> the request's context in some setups. If queries don't appear, prefer a
+> per-request Prisma extension/middleware that calls `trackQuery`.
+
+**Knex** - subscribe to its (synchronous, reliable) query events:
+
+```js
+const timers = new Map();
+knex.on("query", (q) => timers.set(q.__knexQueryUid, process.hrtime.bigint()));
+knex.on("query-response", (_res, q) => {
+  const start = timers.get(q.__knexQueryUid);
+  const ms = start ? Number(process.hrtime.bigint() - start) / 1e6 : 0;
+  timers.delete(q.__knexQueryUid);
+  trackQuery(q.sql, ms);
+});
+```
+
+**Sequelize** - turn on `benchmark` and forward from the `logging` callback:
+
+```js
+const sequelize = new Sequelize(connectionString, {
+  benchmark: true, // provides the execution time (ms) as the 2nd arg
+  logging: (sql, ms) => trackQuery(sql, ms),
+});
+```
+
 ## Configuration Reference
 
-### Default masked fields
+### Masking sensitive data
 
-Treblle automatically masks sensitive fields in request and response bodies. The following fields are masked by default:
+Treblle masks sensitive values in request/response **bodies and headers** before
+anything leaves your server. Matching is case-insensitive and applies to values
+of any type (strings, numbers, nested objects and arrays).
+
+Masking is driven entirely by the `additionalFieldsToMask` option, which is the
+authoritative list of keywords to mask. Its behavior depends on what you pass:
+
+| `additionalFieldsToMask` | Behavior |
+| --- | --- |
+| **not set** (default) | The built-in [default keywords](#default-masked-keywords) are masked |
+| **your own array** | Exactly the keywords you list are masked - this **replaces** the defaults |
+| **`[]` (empty array)** | Masking is **turned off entirely** - bodies and headers are sent as-is |
+
+#### Default masked keywords
+
+When you don't set `additionalFieldsToMask`, the following keywords are masked by default:
 
 - `password`
 - `pwd`
@@ -633,16 +744,63 @@ Treblle automatically masks sensitive fields in request and response bodies. The
 - `ssn`
 - `credit_score`
 - `creditScore`
+- `authorization`
+- `cookie`
+- `set-cookie`
+- `x-api-key`
+- `api_key`
+- `apikey`
+- `token`
+- `access_token`
+- `accessToken`
+- `refresh_token`
+- `refreshToken`
+- `bearer`
+- `x-auth-token`
 
-You can add additional fields to mask using the `additionalFieldsToMask` option:
+#### Adding to the defaults
+
+Because your array replaces the defaults, extend them by spreading the exported
+`DEFAULT_MASKED_KEYWORDS` list rather than listing every default by hand:
+
+```js
+const { useTreblle, DEFAULT_MASKED_KEYWORDS } = require("treblle");
+
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  additionalFieldsToMask: [...DEFAULT_MASKED_KEYWORDS, "customSecret", "internalId"],
+});
+```
+
+If you only want to mask your own specific keywords (and none of the defaults),
+just pass your list directly:
 
 ```js
 useTreblle(app, {
   sdkToken: "_YOUR_SDK_TOKEN_",
   apiKey: "_YOUR_API_KEY_",
-  additionalFieldsToMask: ["customSecret", "internalId", "sessionToken"],
+  additionalFieldsToMask: ["customSecret", "internalId"], // defaults are NOT applied
 });
 ```
+
+#### Turning masking off
+
+Pass an empty array to disable masking completely. Treblle then skips masking
+altogether and sends bodies and headers exactly as received:
+
+```js
+useTreblle(app, {
+  sdkToken: "_YOUR_SDK_TOKEN_",
+  apiKey: "_YOUR_API_KEY_",
+  additionalFieldsToMask: [], // masking disabled
+});
+```
+
+> ⚠️ **Security warning:** With masking off, sensitive request/response body
+> fields **and headers** - including `Authorization`, `Cookie`, API keys and
+> tokens - are sent to Treblle in plaintext. Only disable masking when you are
+> certain no sensitive data flows through the monitored endpoints.
 
 ### Default blocked paths
 

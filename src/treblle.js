@@ -6,6 +6,30 @@ const {
   createStartTime,
 } = require("./sender");
 const { DefaultBlockedPatterns } = require("./consts");
+const { createQueryStore, runWithQueryContext } = require("./queryTracking");
+
+/**
+ * Normalizes a URL or path down to just its pathname, stripping any query
+ * string or hash. Handles both absolute URLs (e.g. Hono's `c.req.url`) and
+ * plain paths (e.g. Koa's `ctx.request.url`) so blocklist matching is
+ * consistent across frameworks and anchored regexes still match.
+ * @param {string} urlOrPath
+ * @returns {string}
+ */
+function extractPathname(urlOrPath) {
+  if (typeof urlOrPath !== "string") return urlOrPath;
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(urlOrPath)) {
+    try {
+      return new URL(urlOrPath).pathname;
+    } catch {
+      // fall through to manual stripping
+    }
+  }
+
+  const queryIndex = urlOrPath.search(/[?#]/);
+  return queryIndex === -1 ? urlOrPath : urlOrPath.slice(0, queryIndex);
+}
 
 /**
  * Checks if a request path should be blocked from Treblle tracking
@@ -53,6 +77,7 @@ function isPathBlocked(path, userBlocklistPaths = [], ignoreDefaults = false) {
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} settings.debug controls error logging when sending data to Treblle
+ * @param {string?} settings.endpoint custom Treblle ingress endpoint (e.g. "https://ingress-eu.treblle.com")
  * @returns {object} updated Express app
  */
 const useTreblle = function (
@@ -60,14 +85,15 @@ const useTreblle = function (
   {
     sdkToken,
     apiKey,
-    additionalFieldsToMask = [],
+    additionalFieldsToMask,
     blocklistPaths = [],
     ignoreDefaultBlockedPaths = false,
     debug = false,
+    endpoint,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  
+
   // Use standard middleware approach instead of patching
   app.use(
     TreblleMiddleware({
@@ -77,21 +103,50 @@ const useTreblle = function (
       blocklistPaths,
       ignoreDefaultBlockedPaths,
       debug,
+      endpoint,
     })
   );
 
-  // Add error handling middleware
-  app.use(
-    TreblleErrorMiddleware({
-      sdkToken,
-      apiKey,
-      fieldsToMaskMap,
-      debug,
-    })
-  );
+  // Add error handling middleware at the END of the stack (see helper).
+  registerErrorMiddleware(app, { debug });
 
   return app;
 };
+
+/**
+ * Registers the Treblle error-recording middleware at the tail of the app's
+ * middleware stack.
+ *
+ * Express only forwards errors to error-handling middleware declared *after*
+ * the handler that threw. Since `useTreblle`/`useNestTreblle` are typically
+ * called before the app's routes are defined, registering the error middleware
+ * inline would place it ahead of every route, making it unreachable via
+ * `next(err)`. Deferring registration with `setImmediate` lets the synchronous
+ * route/middleware setup finish first, so the recorder lands last in the stack
+ * and is reached when a route errors — while still being in place before any
+ * request is handled.
+ *
+ * @param {object} app Express app
+ * @param {object} settings
+ * @param {boolean} settings.debug
+ */
+function registerErrorMiddleware(app, { debug }) {
+  const register = () => {
+    try {
+      app.use(TreblleErrorMiddleware({ debug }));
+    } catch (err) {
+      if (debug) {
+        console.error("Treblle failed to register error middleware:", err);
+      }
+    }
+  };
+
+  if (typeof setImmediate === "function") {
+    setImmediate(register);
+  } else {
+    register();
+  }
+}
 
 /**
  * Adds the Treblle middleware to the app.
@@ -104,6 +159,7 @@ const useTreblle = function (
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} settings.ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} settings.debug controls error logging when sending data to Treblle
+ * @param {string?} settings.endpoint custom Treblle ingress endpoint (e.g. "https://ingress-eu.treblle.com")
  * @returns {object} updated Express app
  */
 const useNestTreblle = function (
@@ -111,14 +167,15 @@ const useNestTreblle = function (
   {
     sdkToken,
     apiKey,
-    additionalFieldsToMask = [],
+    additionalFieldsToMask,
     blocklistPaths = [],
     ignoreDefaultBlockedPaths = false,
     debug = false,
+    endpoint,
   }
 ) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
-  
+
   // Use standard middleware approach instead of patching
   app.use(
     TreblleMiddleware({
@@ -128,60 +185,40 @@ const useNestTreblle = function (
       blocklistPaths,
       ignoreDefaultBlockedPaths,
       debug,
+      endpoint,
       isNestjs: true,
     })
   );
 
-  // Add error handling middleware
-  app.use(
-    TreblleErrorMiddleware({
-      sdkToken,
-      apiKey,
-      fieldsToMaskMap,
-      debug,
-      isNestjs: true,
-    })
-  );
+  // Add error handling middleware at the END of the stack (see helper).
+  registerErrorMiddleware(app, { debug });
 
   return app;
 };
 
 /**
  * Error handling middleware for Treblle.
- * This replaces the invasive app.handle patching with standard Express error middleware.
+ *
+ * This records the error on the request so the tracking middleware's "finish"
+ * handler can attach it to the single payload it already sends for the request.
+ * Recording (rather than sending here) avoids emitting a duplicate payload,
+ * since the response's "finish" event fires regardless of the error.
  *
  * @param {object} settings
- * @param {string} settings.sdkToken Treblle SDK token
- * @param {string} settings.apiKey Treblle API key
- * @param {object} settings.fieldsToMaskMap map of fields to mask
  * @param {boolean} settings.debug controls error logging
  * @returns {function} Express error middleware
  */
-function TreblleErrorMiddleware({
-  sdkToken,
-  apiKey,
-  fieldsToMaskMap,
-  debug,
-  isNestjs,
-}) {
+function TreblleErrorMiddleware({ debug }) {
   return function _TreblleErrorMiddleware(err, req, res, next) {
     try {
-      // Send error data to Treblle
-      sendExpressPayloadToTreblle(req, res, {
-        error: err,
-        sdkToken,
-        apiKey,
-        fieldsToMaskMap,
-        requestStartTime: req._treblleStartTime || process.hrtime(),
-        debug,
-        sdk: isNestjs ? "nest" : "express",
-      });
+      // Stash the error; the "finish" handler in TreblleMiddleware picks it up.
+      req._treblleError = err;
     } catch (treblleError) {
       if (debug) {
-        console.error('Treblle error middleware failed:', treblleError);
+        console.error("Treblle error middleware failed:", treblleError);
       }
     }
-    
+
     // Always call next to pass the error to the next error handler
     next(err);
   };
@@ -194,9 +231,14 @@ function TreblleMiddleware({
   blocklistPaths,
   ignoreDefaultBlockedPaths,
   debug,
+  endpoint,
   isNestjs,
 }) {
   return function _TreblleMiddlewareHandler(req, res, next) {
+    // Per-request store for tracked SQL queries. Held in the closure so the
+    // "finish" handler (which runs outside the ALS context) can still read it.
+    const queryStore = createQueryStore();
+
     try {
       const requestStartTime = process.hrtime();
       req._treblleStartTime = requestStartTime;
@@ -215,6 +257,10 @@ function TreblleMiddleware({
             requestStartTime,
             fieldsToMaskMap,
             debug,
+            endpoint,
+            // Set by TreblleErrorMiddleware when a downstream route throws.
+            error: req._treblleError,
+            queries: queryStore.queries,
             sdk: isNestjs ? "nest" : "express",
           });
         }
@@ -223,8 +269,14 @@ function TreblleMiddleware({
       if (debug) {
         console.error('Treblle middleware error:', err);
       }
-    } finally {
       next && next();
+      return;
+    }
+
+    // Run the rest of the request within the query-tracking context so
+    // `trackQuery` calls made by downstream handlers land in `queryStore`.
+    if (next) {
+      runWithQueryContext(queryStore, () => next());
     }
   };
 }
@@ -268,6 +320,7 @@ function captureResponseBody(res) {
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
  * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
+ * @param {string?} endpoint custom Treblle ingress endpoint (e.g. "https://ingress-eu.treblle.com")
  * @returns {function} koa middleware function
  */
 function koaTreblle({
@@ -277,12 +330,13 @@ function koaTreblle({
   blocklistPaths = [],
   ignoreDefaultBlockedPaths = false,
   debug = false,
+  endpoint,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (ctx, next) {
     // Check if the request path is blocked
-    const pathBlocked = isPathBlocked(ctx.request.url, blocklistPaths, ignoreDefaultBlockedPaths);
+    const pathBlocked = isPathBlocked(extractPathname(ctx.request.url), blocklistPaths, ignoreDefaultBlockedPaths);
 
     if (pathBlocked) {
       return next();
@@ -295,6 +349,7 @@ function koaTreblle({
       apiKey,
       fieldsToMaskMap,
       debug,
+      endpoint,
     });
   };
 }
@@ -308,6 +363,7 @@ function koaTreblle({
  * @param {(string[]|RegExp)?} settings.blocklistPaths specify additional paths to hide
  * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
+ * @param {string?} endpoint custom Treblle ingress endpoint (e.g. "https://ingress-eu.treblle.com")
  * @param {string[]} ignoreAdminRoutes controls logging /admin routes
  * @returns {function} koa middleware function
  */
@@ -318,19 +374,22 @@ function strapiTreblle({
   blocklistPaths = [],
   ignoreDefaultBlockedPaths = false,
   debug = false,
+  endpoint,
   ignoreAdminRoutes = ["admin", "content-type-builder", "content-manager"],
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (ctx, next) {
+    const pathname = extractPathname(ctx.request.url);
+
     // option to ignore admin routes since everything is served via koa
-    const [_, path] = ctx.request.url.split("/");
+    const [_, path] = pathname.split("/");
     if (ignoreAdminRoutes.includes(path)) {
       return next();
     }
 
     // Check if the request path is blocked
-    const pathBlocked = isPathBlocked(ctx.request.url, blocklistPaths, ignoreDefaultBlockedPaths);
+    const pathBlocked = isPathBlocked(pathname, blocklistPaths, ignoreDefaultBlockedPaths);
 
     if (pathBlocked) {
       return next();
@@ -343,6 +402,7 @@ function strapiTreblle({
       apiKey,
       fieldsToMaskMap,
       debug,
+      endpoint,
       sdk: "strapi",
     });
   };
@@ -355,18 +415,22 @@ async function koaMiddlewareFn({
   apiKey,
   fieldsToMaskMap,
   debug,
+  endpoint,
   sdk = "koa",
 }) {
   const requestStartTime = process.hrtime();
+  const queryStore = createQueryStore();
 
   try {
-    await next();
+    await runWithQueryContext(queryStore, () => next());
     sendKoaPayloadToTreblle(ctx, {
       sdkToken,
       apiKey,
       requestStartTime,
       fieldsToMaskMap,
       debug,
+      endpoint,
+      queries: queryStore.queries,
       sdk,
     });
   } catch (error) {
@@ -376,7 +440,9 @@ async function koaMiddlewareFn({
       requestStartTime,
       fieldsToMaskMap,
       debug,
+      endpoint,
       error,
+      queries: queryStore.queries,
       sdk,
     });
     throw error;
@@ -393,6 +459,7 @@ async function koaMiddlewareFn({
  * @param {(string[]|RegExp)?} blocklistPaths specify additional paths to hide
  * @param {boolean?} ignoreDefaultBlockedPaths ignore default blocked paths (favicon.ico, robots.txt, etc.)
  * @param {boolean?} debug controls error logging when sending data to Treblle
+ * @param {string?} endpoint custom Treblle ingress endpoint (e.g. "https://ingress-eu.treblle.com")
  * @returns {function} hono middleware function
  */
 function honoTreblle({
@@ -402,12 +469,13 @@ function honoTreblle({
   blocklistPaths = [],
   ignoreDefaultBlockedPaths = false,
   debug = false,
+  endpoint,
 }) {
   const fieldsToMaskMap = generateFieldsToMaskMap(additionalFieldsToMask);
 
   return async function (c, next) {
     // Check if the request path is blocked
-    const pathBlocked = isPathBlocked(c.req.url, blocklistPaths, ignoreDefaultBlockedPaths);
+    const pathBlocked = isPathBlocked(extractPathname(c.req.url), blocklistPaths, ignoreDefaultBlockedPaths);
 
     if (pathBlocked) {
       return next();
@@ -420,6 +488,7 @@ function honoTreblle({
       apiKey,
       fieldsToMaskMap,
       debug,
+      endpoint,
     });
   };
 }
@@ -431,7 +500,9 @@ async function honoTask({
   requestStartTime,
   fieldsToMaskMap,
   debug,
+  endpoint,
   error,
+  queries,
 }) {
   try {
     await captureHonoRequestBody(c);
@@ -443,7 +514,9 @@ async function honoTask({
       requestStartTime,
       fieldsToMaskMap,
       debug,
+      endpoint,
       error,
+      queries,
     })
   }
 }
@@ -455,12 +528,14 @@ async function honoMiddlewareFn({
   apiKey,
   fieldsToMaskMap,
   debug,
+  endpoint,
 }) {
   const requestStartTime = createStartTime();
+  const queryStore = createQueryStore();
   const wrapper = 'executionCtx' in c ? c.executionCtx.waitUntil.bind(c.executionCtx) : (p) => p.catch(() => {})
 
   try {
-    await next();
+    await runWithQueryContext(queryStore, () => next());
     wrapper(
       honoTask({
         c,
@@ -469,6 +544,8 @@ async function honoMiddlewareFn({
         requestStartTime,
         fieldsToMaskMap,
         debug,
+        endpoint,
+        queries: queryStore.queries,
       })
     );
 
@@ -481,7 +558,9 @@ async function honoMiddlewareFn({
         requestStartTime,
         fieldsToMaskMap,
         debug,
+        endpoint,
         error,
+        queries: queryStore.queries,
       })
     );
     throw error;
@@ -491,16 +570,25 @@ async function honoMiddlewareFn({
 async function captureHonoRequestBody(c) {
   try {
     if (c.req?.method !== 'GET') {
-      // Try to read as text first
+      const contentType = c.req.header('content-type') || '';
       let requestBody = null;
 
+      // Read the body exactly once, based on the content type. Reading it
+      // more than once can consume the underlying stream and lose data.
       try {
-        requestBody = await c.req.json()
-      } catch {}
-
-      try {
-        requestBody = await c.req.text()
-      } catch {}
+        if (contentType.includes('application/json')) {
+          requestBody = await c.req.json();
+        } else if (
+          contentType.includes('form-urlencoded') ||
+          contentType.includes('multipart/form-data')
+        ) {
+          requestBody = await c.req.parseBody();
+        } else {
+          requestBody = await c.req.text();
+        }
+      } catch {
+        requestBody = null;
+      }
 
       // Store captured body for later access
       c.__treblle_body_request = requestBody;
@@ -550,4 +638,7 @@ module.exports = {
   strapiTreblle,
   useNestTreblle,
   honoTreblle,
+  // Exported for unit testing
+  isPathBlocked,
+  extractPathname,
 };

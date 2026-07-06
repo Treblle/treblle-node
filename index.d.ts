@@ -42,4 +42,15 @@ declare module "treblle" {
   export function useNestTreblle(app: any, options: OptionsBase): void;
 
   export function honoTreblle(options: OptionsBase): Function;
+
+  /**
+   * Records a database query against the currently in-flight request so it is
+   * included in the Treblle payload's `data.queries` array. Store only the
+   * parameterized SQL string (never the parameter bindings) to avoid capturing
+   * sensitive data. No-op when called outside of a tracked request.
+   *
+   * @param sql the (parameterized) SQL query string
+   * @param time query execution time in milliseconds
+   */
+  export function trackQuery(sql: string, time: number): void;
 }
