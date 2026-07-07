@@ -76,7 +76,7 @@ test("honoTreblle sends a payload after next() resolves", async () => {
     const envelope = await captured;
 
     assert.equal(envelope.sdk, "hono");
-    assert.equal(envelope.version, 20);
+    assert.equal(envelope.version, 30);
     assert.equal(envelope.data.request.method, "POST");
     assert.equal(envelope.data.request.ip, "10.1.2.3");
     assert.equal(envelope.data.request.route_path, "/login");

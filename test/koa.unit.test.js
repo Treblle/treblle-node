@@ -67,7 +67,7 @@ test("koaTreblle sends a payload after next() resolves", async () => {
     const envelope = await captured;
 
     assert.equal(envelope.sdk, "koa");
-    assert.equal(envelope.version, 20);
+    assert.equal(envelope.version, 30);
     assert.equal(envelope.data.request.method, "GET");
     assert.equal(envelope.data.response.code, 200);
     assert.deepEqual(envelope.data.request.body, { x: "1" });
