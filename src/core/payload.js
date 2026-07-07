@@ -9,9 +9,9 @@ const { MAX_QUERIES } = require("../queryTracking");
 /**
  * Treblle API payload version - this should be incremented whenever the payload structure changes
  * to ensure backward compatibility with older SDKs.
- * The current version is 20 which would map to 2.0
+ * The current version is 30 which would map to 3.0
  */
-const PAYLOAD_VERSION = 20;
+const PAYLOAD_VERSION = 30;
 
 // Upper bound on errors included in a single payload. Extra errors past the cap
 // are dropped so the payload stays small and predictable.

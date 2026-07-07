@@ -120,7 +120,7 @@ test("useFastifyTreblle sends a payload with request/response data", async () =>
     const envelope = await captured;
 
     assert.equal(envelope.sdk, "fastify");
-    assert.equal(envelope.version, 20);
+    assert.equal(envelope.version, 30);
     assert.equal(envelope.data.request.method, "GET");
     assert.equal(envelope.data.request.url, "http://localhost:3000/items?x=1");
     assert.equal(envelope.data.request.route_path, "/items");

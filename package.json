@@ -1,7 +1,7 @@
 {
   "name": "treblle",
   "version": "3.0.0",
-  "description": "Treblle Javascript SDK",
+  "description": "Runtime Intelligence Platform",
   "main": "index.js",
   "types": "index.d.ts",
   "exports": {
@@ -31,7 +31,7 @@
   },
   "keywords": [
     "treblle",
-    "api",
+    "runtime",
     "observability",
     "intelligence",
     "express",
@@ -39,10 +39,9 @@
     "nestjs",
     "hono",
     "fastify",
-    "strapi",
-    "api-intelligence"
+    "strapi"
   ],
-  "author": "Treblle<support@treblle.com>",
+  "author": "Vedran Cindric<vedran@treblle.com>",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

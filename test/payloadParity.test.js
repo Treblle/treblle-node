@@ -131,7 +131,7 @@ test("express payload envelope is stable", async () => {
     assert.deepStrictEqual(normalizeEnvelope(envelope), {
       sdk_token: "test-sdk-token",
       api_key: "test-api-key",
-      version: 20,
+      version: 30,
       sdk: "express",
       data: {
         server: { ...SERVER_BLOCK, protocol: "HTTP/1.1" },
@@ -230,7 +230,7 @@ test("koa payload envelope is stable", async () => {
     assert.deepStrictEqual(normalizeEnvelope(envelope), {
       sdk_token: "test-sdk-token",
       api_key: "test-api-key",
-      version: 20,
+      version: 30,
       sdk: "koa",
       data: {
         server: { ...SERVER_BLOCK, protocol: "HTTP/1.1" },
@@ -301,7 +301,7 @@ test("hono payload envelope is stable", async () => {
     assert.deepStrictEqual(normalizeEnvelope(envelope), {
       sdk_token: "test-sdk-token",
       api_key: "test-api-key",
-      version: 20,
+      version: 30,
       sdk: "hono",
       data: {
         server: { ...SERVER_BLOCK, protocol: "HTTP/1.1" },
