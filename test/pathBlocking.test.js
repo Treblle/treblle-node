@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
-const { isPathBlocked, extractPathname } = require("../src/treblle");
+const { isPathBlocked, extractPathname } = require("../src/core/blocklist");
 
 test("extractPathname strips query strings from plain paths", () => {
   assert.equal(extractPathname("/robots.txt?foo=1"), "/robots.txt");
@@ -59,10 +59,12 @@ test("isPathBlocked honors an array containing RegExp entries", () => {
   assert.equal(isPathBlocked("/prod/info", [/^\/debug/, "admin"]), false);
 });
 
-test("isPathBlocked can ignore default patterns", () => {
-  assert.equal(isPathBlocked("/favicon.ico", [], true), false);
-  // user blocklist still applies even when defaults are ignored
-  assert.equal(isPathBlocked("/health", ["health"], true), true);
+test("isPathBlocked always applies default patterns (not configurable)", () => {
+  // Defaults are always on — there is no opt-out.
+  assert.equal(isPathBlocked("/favicon.ico"), true);
+  assert.equal(isPathBlocked("/favicon.ico", ["health"]), true);
+  // user blocked paths are applied on top of the defaults
+  assert.equal(isPathBlocked("/health", ["health"]), true);
 });
 
 test("anchored default patterns match after query strings are normalized away", () => {

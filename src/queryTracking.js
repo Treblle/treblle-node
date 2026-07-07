@@ -2,22 +2,34 @@ const { AsyncLocalStorage } = require("node:async_hooks");
 
 // Upper bounds to keep the payload small and predictable. Queries past the cap
 // are dropped silently; over-long SQL strings are truncated.
-const MAX_QUERIES = 100;
+const MAX_QUERIES = 50;
 const MAX_SQL_LENGTH = 2048;
 
 /**
- * Request-scoped storage for tracked database queries. A store is opened per
- * request by the framework middleware (see `runWithQueryContext`) so that
- * `trackQuery` calls made anywhere during that request land in the right bucket.
+ * Request-scoped storage for the shared per-request context. A store is opened
+ * per request by the framework middleware (see `runWithQueryContext`) so that
+ * `trackQuery` and `setMetadata` calls made anywhere during that request land in
+ * the right bucket.
  */
 const queryStorage = new AsyncLocalStorage();
 
 /**
- * Creates an empty per-request query store.
- * @returns {{ queries: Array<{ sql: string, time: number }> }}
+ * Creates an empty per-request context store. It holds both tracked queries and
+ * custom metadata (see `src/metadata.js`).
+ * @returns {{ queries: Array<{ sql: string, time: number }>, metadata: object }}
  */
 function createQueryStore() {
-  return { queries: [] };
+  return { queries: [], metadata: {} };
+}
+
+/**
+ * Returns the store for the active request context, or undefined when there is
+ * no active context. Lets sibling modules (e.g. metadata) reach the same store
+ * without creating a second `AsyncLocalStorage`.
+ * @returns {object|undefined}
+ */
+function getActiveStore() {
+  return queryStorage.getStore();
 }
 
 /**
@@ -32,6 +44,22 @@ function runWithQueryContext(store, fn) {
 }
 
 /**
+ * Sets `store` as the active query context for the remainder of the current
+ * async execution and all of its descendants, without wrapping a callback.
+ *
+ * Adapters that own a callback boundary (Express/Koa/Hono `next()`) should use
+ * {@link runWithQueryContext}. Fastify has no such boundary — hooks and the
+ * route handler are separate functions in one continuous async context — so its
+ * adapter enters the store from an `onRequest` hook and relies on propagation to
+ * the handler (the same approach `@fastify/request-context` uses).
+ *
+ * @param {object} store store from `createQueryStore`
+ */
+function enterQueryContext(store) {
+  queryStorage.enterWith(store);
+}
+
+/**
  * Best-effort scrubbing of inline literal values from a SQL string so no
  * sensitive data leaks into the payload. Replaces single-quoted string literals
  * and standalone numeric literals with `?`. This is a safety net: when queries
@@ -42,12 +70,14 @@ function runWithQueryContext(store, fn) {
  */
 function sanitizeSql(sql) {
   if (typeof sql !== "string") return "";
-  return sql
-    // single-quoted string literals, handling escaped quotes
-    .replace(/'(?:[^'\\]|\\.)*'/g, "?")
-    // standalone numeric literals — but not parts of identifiers (`col1`) or
-    // positional/named placeholders (`$1`, `:1`) which must be preserved
-    .replace(/(?<![\w$:])\d+(?:\.\d+)?\b/g, "?");
+  return (
+    sql
+      // single-quoted string literals, handling escaped quotes
+      .replace(/'(?:[^'\\]|\\.)*'/g, "?")
+      // standalone numeric literals — but not parts of identifiers (`col1`) or
+      // positional/named placeholders (`$1`, `:1`) which must be preserved
+      .replace(/(?<![\w$:])\d+(?:\.\d+)?\b/g, "?")
+  );
 }
 
 /**
@@ -96,7 +126,9 @@ module.exports = {
   MAX_QUERIES,
   MAX_SQL_LENGTH,
   createQueryStore,
+  getActiveStore,
   runWithQueryContext,
+  enterQueryContext,
   trackQuery,
   getTrackedQueries,
   sanitizeSql,

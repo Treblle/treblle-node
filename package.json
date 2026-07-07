@@ -1,9 +1,21 @@
 {
   "name": "treblle",
-  "version": "2.0.4",
+  "version": "3.0.0",
   "description": "Treblle Javascript SDK",
   "main": "index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./express": "./src/adapters/express.js",
+    "./koa": "./src/adapters/koa.js",
+    "./strapi": "./src/adapters/koa.js",
+    "./hono": "./src/adapters/hono.js",
+    "./fastify": "./src/adapters/fastify.js",
+    "./package.json": "./package.json"
+  },
   "directories": {
     "test": "test"
   },
@@ -24,14 +36,17 @@
     "intelligence",
     "express",
     "koa",
-    "nestjs", 
+    "nestjs",
     "hono",
+    "fastify",
     "strapi",
-    "cloudflare-workers",
     "api-intelligence"
   ],
   "author": "Treblle<support@treblle.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "bugs": {
     "url": "https://github.com/Treblle/treblle-node/issues"
   },
@@ -40,10 +55,11 @@
     "stack-trace": "^1.0.0"
   },
   "peerDependencies": {
-    "express": "^4.0.0 || ^5.0.0",
-    "koa": "^2.0.0 || ^3.0.0",
     "@nestjs/core": "^9.0.0 || ^10.0.0 || ^11.0.0",
-    "hono": "^4.0.0"
+    "express": "^4.0.0 || ^5.0.0",
+    "fastify": "^4.0.0 || ^5.0.0",
+    "hono": "^4.0.0",
+    "koa": "^2.0.0 || ^3.0.0"
   },
   "peerDependenciesMeta": {
     "express": {
@@ -57,13 +73,14 @@
     },
     "hono": {
       "optional": true
+    },
+    "fastify": {
+      "optional": true
     }
-  },
-  "optionalDependencies": {
-    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "express": "^5.2.1",
+    "fastify": "^5.10.0",
     "prettier": "^3.9.4"
   }
 }

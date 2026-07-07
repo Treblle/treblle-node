@@ -5,18 +5,21 @@ const zlib = require("node:zlib");
 const {
   getPayloadSize,
   checkPayloadSize,
-  getRandomEndpoint,
+  MAX_PAYLOAD_SIZE,
+} = require("../src/core/sizeLimit");
+const {
   resolveEndpoint,
-  createStartTime,
-  getRequestDuration,
-  transformToOpenAPIFormat,
-  getPayload,
   maybeGzipBody,
   GZIP_MIN_BYTES,
   TREBLLE_ENDPOINT,
-  TREBLLE_ENDPOINTS,
-  MAX_PAYLOAD_SIZE,
-} = require("../src/sender");
+} = require("../src/core/transport");
+const { createStartTime, getRequestDuration } = require("../src/core/timing");
+const {
+  transformToOpenAPIFormat,
+  getPayload,
+  maskUrlQueryString,
+} = require("../src/core/payload");
+const { generateFieldsToMaskMap } = require("../src/maskFields");
 
 test("getPayloadSize handles null/undefined", () => {
   assert.equal(getPayloadSize(null), 0);
@@ -49,18 +52,28 @@ test("checkPayloadSize returns payload unchanged when under the limit", () => {
   assert.equal(checkPayloadSize(payload), payload);
 });
 
+test("MAX_PAYLOAD_SIZE is 2MB", () => {
+  assert.equal(MAX_PAYLOAD_SIZE, 2 * 1024 * 1024);
+});
+
 test("checkPayloadSize returns a too-large marker when over the limit", () => {
   const big = "x".repeat(MAX_PAYLOAD_SIZE + 1);
   const result = checkPayloadSize(big);
   assert.equal(typeof result, "object");
-  assert.match(result.message, /5MB/);
-  assert.ok(result.actual_size_bytes > MAX_PAYLOAD_SIZE);
+  assert.match(result.message, /payload is too large/);
+  assert.ok(result.size_bytes > MAX_PAYLOAD_SIZE);
 });
 
-test("getRandomEndpoint returns a known Treblle endpoint", () => {
-  for (let i = 0; i < 50; i++) {
-    assert.ok(TREBLLE_ENDPOINTS.includes(getRandomEndpoint()));
-  }
+test("checkPayloadSize labels the marker request vs response", () => {
+  const big = "x".repeat(MAX_PAYLOAD_SIZE + 1);
+  assert.equal(
+    checkPayloadSize(big, "request").message,
+    "Request payload is too large",
+  );
+  assert.equal(
+    checkPayloadSize(big, "response").message,
+    "Response payload is too large",
+  );
 });
 
 test("default endpoint is the ingress host", () => {
@@ -78,12 +91,12 @@ test("resolveEndpoint falls back to the default when no endpoint is given", () =
 test("resolveEndpoint uses a custom endpoint when provided", () => {
   assert.equal(
     resolveEndpoint("https://ingress-eu.treblle.com"),
-    "https://ingress-eu.treblle.com"
+    "https://ingress-eu.treblle.com",
   );
   // surrounding whitespace is trimmed
   assert.equal(
     resolveEndpoint("  https://ingress-eu.treblle.com  "),
-    "https://ingress-eu.treblle.com"
+    "https://ingress-eu.treblle.com",
   );
 });
 
@@ -99,23 +112,17 @@ test("getRequestDuration returns a non-negative number for a numeric start", () 
   assert.ok(duration >= 0);
 });
 
-test("getRequestDuration handles hrtime array format", () => {
-  const start = process.hrtime();
-  const duration = getRequestDuration(start);
-  assert.equal(typeof duration, "number");
-  assert.ok(duration >= 0);
-});
-
 test("getRequestDuration returns 0 for unrecognized input", () => {
   assert.equal(getRequestDuration("not-a-time"), 0);
   assert.equal(getRequestDuration(null), 0);
+  assert.equal(getRequestDuration(process.hrtime()), 0);
 });
 
 test("transformToOpenAPIFormat converts :param to {param}", () => {
   assert.equal(transformToOpenAPIFormat("/users/:id"), "/users/{id}");
   assert.equal(
     transformToOpenAPIFormat("/users/:userId/posts/:postId"),
-    "/users/{userId}/posts/{postId}"
+    "/users/{userId}/posts/{postId}",
   );
 });
 
@@ -138,6 +145,35 @@ test("getPayload parses JSON strings", () => {
 
 test("getPayload returns null for unparseable strings", () => {
   assert.equal(getPayload("not json"), null);
+});
+
+test("maskUrlQueryString masks sensitive query params by value length", () => {
+  const map = generateFieldsToMaskMap(["token", "password"]);
+  assert.equal(
+    maskUrlQueryString("https://x.com/login?token=abc123&page=2", map),
+    "https://x.com/login?token=******&page=2",
+  );
+});
+
+test("maskUrlQueryString is case-insensitive and preserves a hash", () => {
+  const map = generateFieldsToMaskMap(["token"]);
+  assert.equal(
+    maskUrlQueryString("https://x.com/a?Token=secret#frag", map),
+    "https://x.com/a?Token=******#frag",
+  );
+});
+
+test("maskUrlQueryString leaves URLs without sensitive params untouched", () => {
+  const map = generateFieldsToMaskMap(["token"]);
+  const url = "https://x.com/a?page=2&sort=asc";
+  assert.equal(maskUrlQueryString(url, map), url);
+  // no query string at all
+  assert.equal(maskUrlQueryString("https://x.com/a", map), "https://x.com/a");
+});
+
+test("maskUrlQueryString is a no-op when masking is disabled", () => {
+  const url = "https://x.com/a?token=secret";
+  assert.equal(maskUrlQueryString(url, null), url);
 });
 
 test("maybeGzipBody leaves small payloads uncompressed", async () => {

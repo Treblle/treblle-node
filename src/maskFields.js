@@ -1,5 +1,5 @@
 // Default list of keywords that get masked in request/response bodies and
-// headers. This is the default *value* of the `additionalFieldsToMask` option:
+// headers. This is the default *value* of the `maskedKeywords` option:
 // consumers can replace it with their own list, extend it (spread this array),
 // or pass an empty array to turn masking off entirely.
 const DEFAULT_MASKED_KEYWORDS = [

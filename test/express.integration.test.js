@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const zlib = require("node:zlib");
 const express = require("express");
 
-const { useTreblle, trackQuery } = require("../index.js");
+const { useTreblle, trackQuery, setMetadata } = require("../index.js");
 const { DEFAULT_MASKED_KEYWORDS } = require("../src/maskFields");
 
 // The SDK sends payloads to *.treblle.com using the global fetch. We swap it
@@ -19,7 +19,8 @@ function installFetchMock() {
       // Mirror what the real ingest endpoint does: decompress when the SDK
       // sends a gzipped body (large payloads), otherwise parse the string.
       const headers = options.headers || {};
-      const encoding = headers["Content-Encoding"] || headers["content-encoding"];
+      const encoding =
+        headers["Content-Encoding"] || headers["content-encoding"];
       const rawBody =
         encoding === "gzip"
           ? zlib.gunzipSync(options.body).toString("utf8")
@@ -52,7 +53,7 @@ async function waitForCaptured(count = 1, timeoutMs = 2000) {
   while (captured.length < count) {
     if (Date.now() - start > timeoutMs) {
       throw new Error(
-        `timed out waiting for ${count} Treblle payload(s); got ${captured.length}`
+        `timed out waiting for ${count} Treblle payload(s); got ${captured.length}`,
       );
     }
     await new Promise((r) => setTimeout(r, 10));
@@ -73,12 +74,27 @@ before(async () => {
     sdkToken: "sdk_test_token",
     apiKey: "proj_test_key",
     // Extend the built-in defaults with a custom field (spread pattern).
-    additionalFieldsToMask: [...DEFAULT_MASKED_KEYWORDS, "secretNote"],
+    maskedKeywords: [...DEFAULT_MASKED_KEYWORDS, "secretNote"],
   });
 
   app.post("/users/:id", (req, res) => {
     res.json({ created: true, password: "responseSecret", secretNote: "hush" });
   });
+  // Mimics a multer upload middleware: text fields land on req.body, the file
+  // on req.files. Treblle should fold in a descriptor, not the raw bytes.
+  const fakeMulter = (req, _res, next) => {
+    req.files = [
+      {
+        fieldname: "document",
+        originalname: "invoice.pdf",
+        mimetype: "application/pdf",
+        size: 20345,
+        buffer: Buffer.alloc(4),
+      },
+    ];
+    next();
+  };
+  app.post("/upload", fakeMulter, (req, res) => res.json({ ok: true }));
   app.get("/health", (req, res) => res.json({ ok: true }));
   app.get("/with-queries", async (req, res) => {
     // Simulate what an ORM's query event would report during the request.
@@ -87,8 +103,13 @@ before(async () => {
     trackQuery("SELECT * FROM sessions WHERE token = 'abc123'", 4);
     res.json({ ok: true });
   });
+  app.get("/with-metadata", (req, res) => {
+    setMetadata("user-id", "john");
+    setMetadata({ plan: "premium", region: "eu" });
+    res.json({ ok: true });
+  });
   app.get("/large", (req, res) =>
-    res.json({ blob: "a".repeat(4096), ok: true })
+    res.json({ blob: "a".repeat(4096), ok: true }),
   );
   app.get("/favicon.ico", (req, res) => res.send("icon"));
   app.get("/boom", () => {
@@ -116,8 +137,8 @@ test("captures a payload with the expected top-level structure", async () => {
   await realFetch(`${baseUrl}/health`);
   const [call] = await waitForCaptured();
 
-  assert.equal(call.payload.api_key, "sdk_test_token");
-  assert.equal(call.payload.project_id, "proj_test_key");
+  assert.equal(call.payload.sdk_token, "sdk_test_token");
+  assert.equal(call.payload.api_key, "proj_test_key");
   assert.equal(call.payload.sdk, "express");
   assert.ok(call.payload.data.request);
   assert.ok(call.payload.data.response);
@@ -143,6 +164,20 @@ test("masks sensitive fields in the request body", async () => {
   assert.equal(call.payload.data.request.body.name, "bob");
 });
 
+test("replaces an uploaded file with a name/type/size descriptor", async () => {
+  await realFetch(`${baseUrl}/upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title: "My upload" }),
+  });
+  const [call] = await waitForCaptured();
+
+  assert.deepEqual(call.payload.data.request.body, {
+    title: "My upload",
+    document: { name: "invoice.pdf", type: "application/pdf", size: 20345 },
+  });
+});
+
 test("masks the Authorization header", async () => {
   await realFetch(`${baseUrl}/health`, {
     headers: { Authorization: "Bearer super-secret-token" },
@@ -150,7 +185,7 @@ test("masks the Authorization header", async () => {
   const [call] = await waitForCaptured();
   assert.equal(
     call.payload.data.request.headers.authorization,
-    "*".repeat("Bearer super-secret-token".length)
+    "*".repeat("Bearer super-secret-token".length),
   );
 });
 
@@ -163,7 +198,10 @@ test("masks sensitive fields in the response body (incl. custom fields)", async 
   const [call] = await waitForCaptured();
 
   assert.equal(call.payload.data.response.body.created, true);
-  assert.equal(call.payload.data.response.body.password, "*".repeat("responseSecret".length));
+  assert.equal(
+    call.payload.data.response.body.password,
+    "*".repeat("responseSecret".length),
+  );
   assert.equal(call.payload.data.response.body.secretNote, "****");
 });
 
@@ -202,7 +240,7 @@ test("captures the unhandled exception when a route throws", async () => {
   assert.equal(call.payload.data.response.code, 500);
 
   const unhandled = call.payload.data.errors.find(
-    (e) => e.type === "UNHANDLED_EXCEPTION"
+    (e) => e.type === "UNHANDLED_EXCEPTION",
   );
   assert.ok(unhandled, "expected an UNHANDLED_EXCEPTION error entry");
   assert.equal(unhandled.message, "kaboom");
@@ -240,6 +278,23 @@ test("data.queries defaults to an empty array when none are tracked", async () =
   await realFetch(`${baseUrl}/health`);
   const [call] = await waitForCaptured();
   assert.deepEqual(call.payload.data.queries, []);
+});
+
+test("includes custom metadata in data.metadata", async () => {
+  await realFetch(`${baseUrl}/with-metadata`);
+  const [call] = await waitForCaptured();
+
+  assert.deepEqual(call.payload.data.metadata, {
+    "user-id": "john",
+    plan: "premium",
+    region: "eu",
+  });
+});
+
+test("data.metadata defaults to an empty object when none is set", async () => {
+  await realFetch(`${baseUrl}/health`);
+  const [call] = await waitForCaptured();
+  assert.deepEqual(call.payload.data.metadata, {});
 });
 
 test("sends exactly one payload per request (no duplicate on error)", async () => {

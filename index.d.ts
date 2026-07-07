@@ -1,47 +1,44 @@
 declare module "treblle" {
-  type OptionsBase = {
+  export type TreblleOptions = {
+    /** Your Treblle SDK token */
     sdkToken: string;
+    /** Your Treblle API key */
     apiKey: string;
-    additionalFieldsToMask?: string[];
+    /**
+     * Keywords to mask in request/response bodies and headers. Replaces the
+     * default list; spread DEFAULT_MASKED_KEYWORDS to extend it, pass [] to
+     * turn masking off.
+     */
+    maskedKeywords?: string[];
+    /** Path prefixes or RegExp to exclude from tracking */
+    blockedPaths?: string[] | RegExp;
+    /** Show Treblle-related errors in the console */
     debug?: boolean;
-    blocklistPaths?: string[] | RegExp;
+    /** Custom Treblle ingress endpoint, e.g. "https://ingress-eu.treblle.com" */
+    ingressEndpoint?: string;
   };
 
-  type StrapiOptionsBase = {
-    sdkToken: string;
-    apiKey: string;
-    additionalFieldsToMask?: string[];
-    debug?: boolean;
-    blocklistPaths?: string[] | RegExp;
+  export type StrapiTreblleOptions = TreblleOptions & {
+    /** Admin route prefixes to skip (default: ["admin", "content-type-builder", "content-manager"]) */
     ignoreAdminRoutes?: string[];
   };
 
-  type FetchEvent = any;
-  type Request = any;
-  type Response = any;
+  export function useTreblle(app: any, options: TreblleOptions): any;
 
-  // Augment Request interface for Cloudflare Workers route_path support
-  interface CloudflareRequest extends Request {
-    route_path?: string;
-  }
+  export function useNestTreblle(app: any, options: TreblleOptions): any;
 
-  export function useTreblle(app: any, options: any): void;
+  export function koaTreblle(options: TreblleOptions): Function;
 
-  export function koaTreblle(options: OptionsBase): Function;
+  export function strapiTreblle(options: StrapiTreblleOptions): Function;
 
-  export function strapiTreblle(options: StrapiOptionsBase): Function;
+  export function honoTreblle(options: TreblleOptions): Function;
 
-  export function serviceWorkerTreblle(
-    options: OptionsBase
-  ): (event: FetchEvent) => void;
+  export function useFastifyTreblle(fastify: any, options: TreblleOptions): any;
 
-  export function moduleWorkerTreblle(
-    options: OptionsBase
-  ): (request: Request) => Promise<Response> | Response;
-
-  export function useNestTreblle(app: any, options: OptionsBase): void;
-
-  export function honoTreblle(options: OptionsBase): Function;
+  export function useNestFastifyTreblle(
+    fastify: any,
+    options: TreblleOptions,
+  ): any;
 
   /**
    * Records a database query against the currently in-flight request so it is
@@ -53,4 +50,62 @@ declare module "treblle" {
    * @param time query execution time in milliseconds
    */
   export function trackQuery(sql: string, time: number): void;
+
+  /** Allowed metadata value types */
+  export type TreblleMetadataValue = string | number | boolean;
+
+  /**
+   * Attaches custom key/value metadata to the currently in-flight request so it
+   * is included in the Treblle payload's `data.metadata` object (alongside
+   * `data.request` / `data.response` / `data.queries`). Primarily used for
+   * search and filtering. No-op when called outside of a tracked request.
+   *
+   * Keys and string values are length-limited, values must be strings, finite
+   * numbers or booleans, and there is a cap on the number of keys per request;
+   * anything over a limit is dropped or truncated. Metadata is NOT masked, so
+   * never put secrets in it.
+   *
+   * @example
+   * setMetadata("user-id", "john");
+   * setMetadata({ plan: "premium", region: "eu" });
+   */
+  export function setMetadata(key: string, value: TreblleMetadataValue): void;
+  export function setMetadata(
+    metadata: Record<string, TreblleMetadataValue>,
+  ): void;
+
+  /** The default list of masked keywords */
+  export const DEFAULT_MASKED_KEYWORDS: string[];
+}
+
+declare module "treblle/express" {
+  import { TreblleOptions } from "treblle";
+  export function useTreblle(app: any, options: TreblleOptions): any;
+  export function useNestTreblle(app: any, options: TreblleOptions): any;
+}
+
+declare module "treblle/koa" {
+  import { TreblleOptions, StrapiTreblleOptions } from "treblle";
+  export function koaTreblle(options: TreblleOptions): Function;
+  export function strapiTreblle(options: StrapiTreblleOptions): Function;
+}
+
+declare module "treblle/strapi" {
+  import { TreblleOptions, StrapiTreblleOptions } from "treblle";
+  export function koaTreblle(options: TreblleOptions): Function;
+  export function strapiTreblle(options: StrapiTreblleOptions): Function;
+}
+
+declare module "treblle/hono" {
+  import { TreblleOptions } from "treblle";
+  export function honoTreblle(options: TreblleOptions): Function;
+}
+
+declare module "treblle/fastify" {
+  import { TreblleOptions } from "treblle";
+  export function useFastifyTreblle(fastify: any, options: TreblleOptions): any;
+  export function useNestFastifyTreblle(
+    fastify: any,
+    options: TreblleOptions,
+  ): any;
 }
